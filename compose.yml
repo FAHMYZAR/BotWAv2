@@ -1,0 +1,16 @@
+services:
+  botwa:
+    image: fahmyzzx/botwa:latest
+    container_name: fahmyzzx-botwa
+    restart: unless-stopped
+    volumes:
+      - botwa-data:/app/auth_info_baileys
+      - ./baileys_store.json:/app/baileys_store.json
+      - ./keynotes.json:/app/keynotes.json
+      - ./registeredGroups.json:/app/registeredGroups.json
+    environment:
+      - TZ=Asia/Jakarta
+      - NODE_ENV=production
+
+volumes:
+  botwa-data:

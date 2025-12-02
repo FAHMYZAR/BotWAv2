@@ -1,50 +1,50 @@
 {
-  "prefix": "^",
+  "prefix": "#",
   "notes": {
-    "aku": {
-      "content": "Siapa saja",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T12:31:52.413Z"
+    "1233": {
+      "content": "26372",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T07:22:46.706Z"
     },
-    "Saya": {
-      "content": "sayasaya",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T12:33:41.260Z"
+    "fahmy": {
+      "content": "baik banget cuy",
+      "author": "6285134511946@s.whatsapp.net",
+      "created": "2025-11-26T06:19:47.100Z"
     },
-    "passwifi": {
-      "content": "masrama99#",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T13:49:43.431Z"
+    "arhan": {
+      "content": "ganteng banget org itu",
+      "author": "6285946225255@s.whatsapp.net",
+      "created": "2025-11-26T06:15:28.220Z"
     },
-    "pam": {
-      "content": "ono opo riss",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T12:45:56.185Z"
+    "aris": {
+      "content": "yah bete gw",
+      "author": "6285134511946@s.whatsapp.net",
+      "created": "2025-11-26T06:23:27.008Z"
     },
-    "assalamualaikum": {
-      "content": "waalaikumsalam brother ada apa! owner nya masih turu",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T12:50:15.979Z"
+    "halo": {
+      "content": "dek",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T06:59:33.828Z"
     },
-    "dika": {
-      "content": "orang jati",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T13:15:26.474Z"
+    "toString": {
+      "content": "{ \"a\": \"b\" }",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T07:22:26.862Z"
     },
-    "rama": {
-      "content": "dia itu ganteng banget",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T14:32:01.670Z"
+    "nama": {
+      "content": "nama",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T07:14:27.443Z"
     },
-    "mii": {
-      "content": "pripunn kang mbak mas??",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T14:32:51.014Z"
+    "toJSON": {
+      "content": "hayya",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T07:20:06.829Z"
     },
-    "sayang": {
-      "content": "dalem sayang",
-      "author": "6285226166485@c.us",
-      "created": "2025-02-24T16:03:30.445Z"
+    "true": {
+      "content": "true",
+      "author": "70953430208605@lid",
+      "created": "2025-11-26T07:23:05.271Z"
     }
   }
 }

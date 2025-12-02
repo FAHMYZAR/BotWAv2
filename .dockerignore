@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Node (jangan exclude node_modules, kita copy langsung)
+npm-debug.log
+
+# Auth & Data (akan di-mount dari host)
+auth_info_baileys/
+auth_info_baileys_dev/
+baileys_store.json
+keynotes.json
+registeredGroups.json
+
+# Temp
+temp/
+*.log
+*.bak
+*.backup
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+compose.yml
+.dockerignore

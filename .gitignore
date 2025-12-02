@@ -4,6 +4,10 @@
 # Ignore wawebjs_cache folder
 .wwebjs_cache/
 
+# Ignore baileys auth folders
+auth_info_baileys/
+auth_info_baileys_dev/
+
 # Ignore node_modules folder
 node_modules/
 
