@@ -22,6 +22,8 @@
   },
   "homepage": "https://github.com/FAHMYZAR/BotWA#readme",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@heyputer/puter.js": "^2.1.7",
     "@tobyg74/tiktok-api-dl": "^1.3.7",
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "axios": "^1.9.0",

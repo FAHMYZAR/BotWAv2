@@ -4,7 +4,7 @@ const sharp = require('sharp');
 
 class StickerFeature extends BaseFeature {
     constructor() {
-        super('sticker', 'Buat sticker dari gambar/video', false);
+        super('sticker', 'Buat sticker dari gambar/video (sticker/s)', false);
         this.aliases = ['s']; // Shortcut
     }
 

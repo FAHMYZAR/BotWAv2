@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-# Install runtime dependencies
+# Install runtime dependencies including Sharp requirements
 RUN apk add --no-cache \
     gcompat \
     cairo \
@@ -10,7 +10,12 @@ RUN apk add --no-cache \
     librsvg \
     pixman \
     ffmpeg \
-    util-linux-dev
+    util-linux-dev \
+    vips-dev \
+    build-base \
+    python3 \
+    make \
+    g++
 
 WORKDIR /app
 
@@ -19,6 +24,9 @@ COPY node_modules ./node_modules
 
 # Copy package files
 COPY package*.json ./
+
+# Install Sharp for Alpine Linux
+RUN npm install --platform=linux --arch=x64 --libc=musl sharp
 
 # Copy application code (sering berubah)
 COPY src ./src

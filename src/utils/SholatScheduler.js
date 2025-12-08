@@ -6,6 +6,10 @@ class SholatScheduler {
     constructor(sock) {
         this.sock = sock;
         this.interval = null;
+        this.dailyResetInterval = null;
+        this.isConnected = false;
+        this.retryQueue = new Map();
+        this.currentJadwal = new Map();
         this.banners = [
             'https://files.catbox.moe/iu92u8.jpg',
             'https://files.catbox.moe/v7u6aw.jpg',
@@ -15,18 +19,8 @@ class SholatScheduler {
         ];
         this.lastBannerIndex = -1;
         this.imsakMessageCache = new Map();
-        this.jadwalCache = new Map();
-        
-        // Juz mapping
-        this.juzSurah = {
-            1: [1, 2],
-            2: [2],
-            22: [36],
-            27: [55, 56],
-            30: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
-        };
-        
-        this.tigaQul = [112, 113, 114];
+        this.quotes = require('./data-quotes.json');
+        this.lastFetchDate = null;
     }
 
     getRandomBanner() {
@@ -39,72 +33,90 @@ class SholatScheduler {
         return this.banners[index];
     }
 
-    async getRandomAyat() {
-        try {
-            const juzOptions = [1, 2, 22, 27, 30];
-            const selectedJuz = juzOptions[Math.floor(Math.random() * juzOptions.length)];
-            
-            const surahList = this.juzSurah[selectedJuz];
-            const surah = surahList[Math.floor(Math.random() * surahList.length)];
-            
-            if (this.tigaQul.includes(surah)) {
-                return await this.getFullSurah(surah);
-            }
-            
-            const ayat = Math.floor(Math.random() * 10) + 1;
-            const url = `${config.apis.lolhuman}/quran/${surah}/${ayat}?apikey=${config.lolhumanApiKey}`;
-            
-            const response = await axios.get(url, { timeout: 5000 });
-            if (response.data.status === 200 && response.data.result && response.data.result.ayat && response.data.result.ayat[0]) {
-                return {
-                    surah: response.data.result.surah,
-                    nomor: response.data.result.nomor,
-                    ayat: response.data.result.ayat[0]
-                };
-            }
-            return null;
-        } catch {
-            return null;
-        }
-    }
-
-    async getFullSurah(surahNumber) {
-        try {
-            const url = `${config.apis.lolhuman}/quran/${surahNumber}?apikey=${config.lolhumanApiKey}`;
-            const response = await axios.get(url, { timeout: 5000 });
-            
-            if (response.data.status === 200 && response.data.result && response.data.result.ayat) {
-                const ayatList = response.data.result.ayat;
-                
-                const arabText = ayatList.map(a => a.arab).join(' ۝ ');
-                const indonesiaText = ayatList.map((a, i) => `${i + 1}. ${a.indonesia}`).join('\n');
-                
-                return {
-                    surah: response.data.result.surah,
-                    nomor: response.data.result.nomor,
-                    ayat: {
-                        ayat: `1-${ayatList.length}`,
-                        arab: arabText,
-                        indonesia: indonesiaText
-                    }
-                };
-            }
-            return null;
-        } catch {
-            return null;
-        }
+    getRandomQuote() {
+        const randomIndex = Math.floor(Math.random() * this.quotes.length);
+        return this.quotes[randomIndex];
     }
 
     start() {
         console.log('[SCHEDULER] Starting sholat reminder...');
+        
+        // Monitor connection status
+        this.sock.ev.on('connection.update', (update) => {
+            if (update.connection === 'open') {
+                this.isConnected = true;
+                console.log('[SCHEDULER] Connection restored, processing retry queue...');
+                this.processRetryQueue();
+            } else if (update.connection === 'close') {
+                this.isConnected = false;
+                console.log('[SCHEDULER] Connection lost');
+            }
+        });
+        
+        // Daily reset at 00:01
+        this.dailyResetInterval = setInterval(() => this.checkDailyReset(), 60000);
+        
         this.interval = setInterval(() => this.check(), 60000);
         this.check();
+    }
+
+    checkDailyReset() {
+        const now = new Date();
+        const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        
+        if (currentTime === '00:01') {
+            console.log('[SCHEDULER] Daily reset: Clearing lastNotified and fetching fresh jadwal...');
+            
+            // Clear all lastNotified
+            const groups = GroupRegistry.getAll();
+            for (const groupJid in groups) {
+                groups[groupJid].lastNotified = {};
+            }
+            GroupRegistry.groups = groups;
+            GroupRegistry.save();
+            
+            // Clear jadwal cache
+            this.currentJadwal.clear();
+            this.lastFetchDate = null;
+            
+            console.log('[SCHEDULER] Daily reset completed');
+        }
+    }
+
+    async processRetryQueue() {
+        if (this.retryQueue.size === 0) return;
+        
+        console.log(`[SCHEDULER] Processing ${this.retryQueue.size} queued messages...`);
+        
+        for (const [key, data] of this.retryQueue.entries()) {
+            try {
+                if (data.nama === 'Subuh' && this.imsakMessageCache.has(data.groupJid)) {
+                    await this.deleteAndSendSubuh(data.groupJid, this.imsakMessageCache.get(data.groupJid), data.waktu, data.kota);
+                    this.imsakMessageCache.delete(data.groupJid);
+                } else if (data.nama === 'Dhuha') {
+                    await this.sendDhuhaReminder(data.groupJid, data.waktu, data.kota);
+                } else {
+                    const messageKey = await this.sendReminder(data.groupJid, data.nama, data.waktu, data.kota, data.subuhTime);
+                    if (data.nama === 'Imsak' && messageKey) {
+                        this.imsakMessageCache.set(data.groupJid, messageKey);
+                    }
+                }
+                
+                GroupRegistry.updateLastNotified(data.groupJid, data.nama);
+                this.retryQueue.delete(key);
+            } catch (error) {
+                console.error(`[SCHEDULER] Retry failed for ${data.nama}:`, error.message);
+            }
+        }
     }
 
     stop() {
         if (this.interval) {
             clearInterval(this.interval);
             console.log('[SCHEDULER] Stopped sholat reminder');
+        }
+        if (this.dailyResetInterval) {
+            clearInterval(this.dailyResetInterval);
         }
     }
 
@@ -118,8 +130,11 @@ class SholatScheduler {
 
         for (const [groupJid, groupData] of Object.entries(groups)) {
             try {
-                const jadwal = await this.getJadwalCached(groupData.kota, today);
-                if (!jadwal) continue;
+                const jadwal = await this.getJadwalFresh(groupData.kota, today);
+                if (!jadwal) {
+                    console.log(`[SCHEDULER] No jadwal for ${groupData.kota}`);
+                    continue;
+                }
 
                 const waktuSholat = {
                     'Imsak': jadwal.imsak,
@@ -132,9 +147,24 @@ class SholatScheduler {
                 };
 
                 for (const [nama, waktu] of Object.entries(waktuSholat)) {
-                    if (currentTime === waktu) {
+                    // Normalize time format (remove seconds if exists)
+                    const normalizedWaktu = waktu ? waktu.substring(0, 5) : '';
+                    
+                    if (currentTime === normalizedWaktu) {
                         if (!GroupRegistry.isNotifiedToday(groupJid, nama)) {
                             console.log(`[SCHEDULER] Sending ${nama} reminder to ${groupJid}`);
+                            
+                            if (!this.isConnected) {
+                                console.log(`[SCHEDULER] Connection not ready, queueing ${nama} for ${groupJid}`);
+                                this.retryQueue.set(`${groupJid}_${nama}`, {
+                                    groupJid,
+                                    nama,
+                                    waktu,
+                                    kota: groupData.kota,
+                                    subuhTime: jadwal.subuh
+                                });
+                                continue;
+                            }
                             
                             if (nama === 'Subuh') {
                                 const imsakKey = this.imsakMessageCache.get(groupJid);
@@ -165,25 +195,34 @@ class SholatScheduler {
         }
     }
 
-    async getJadwalCached(kota, today) {
+    async getJadwalFresh(kota, today) {
+        // Fetch fresh jadwal only once per day
+        if (this.lastFetchDate !== today) {
+            console.log(`[SCHEDULER] Fetching fresh jadwal for new day: ${today}`);
+            this.currentJadwal.clear();
+            this.lastFetchDate = today;
+        }
+        
         const cacheKey = `${kota}_${today}`;
         
-        if (this.jadwalCache.has(cacheKey)) {
-            console.log(`[SCHEDULER] Using cached jadwal for ${kota}`);
-            return this.jadwalCache.get(cacheKey);
+        if (this.currentJadwal.has(cacheKey)) {
+            return this.currentJadwal.get(cacheKey);
         }
 
         console.log(`[SCHEDULER] Fetching jadwal from API for ${kota}`);
         const jadwal = await this.getJadwal(kota);
         
         if (jadwal) {
-            this.jadwalCache.set(cacheKey, jadwal);
-            
-            for (const key of this.jadwalCache.keys()) {
-                if (!key.endsWith(today)) {
-                    this.jadwalCache.delete(key);
-                }
-            }
+            console.log(`[SCHEDULER] ${kota} jadwal:`, {
+                imsak: jadwal.imsak,
+                subuh: jadwal.subuh,
+                dhuha: jadwal.dhuha,
+                dzuhur: jadwal.dzuhur,
+                ashar: jadwal.ashar,
+                maghrib: jadwal.maghrib,
+                isya: jadwal.isya
+            });
+            this.currentJadwal.set(cacheKey, jadwal);
         }
         
         return jadwal;
@@ -202,10 +241,31 @@ class SholatScheduler {
         }
     }
 
+    async sendWithRetry(groupJid, message, nama, maxRetries = 3) {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                if (!this.isConnected) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    continue;
+                }
+                
+                const sent = await this.sock.sendMessage(groupJid, message);
+                console.log(`[SCHEDULER] Sent ${nama} reminder to ${groupJid}`);
+                return sent.key;
+            } catch (error) {
+                console.error(`[SCHEDULER] Send attempt ${i + 1}/${maxRetries} failed:`, error.message);
+                if (i < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+        }
+        throw new Error('Max retries reached');
+    }
+
     async sendReminder(groupJid, nama, waktu, kota, subuhTime = null) {
         try {
             const banner = this.getRandomBanner();
-            const ayatData = await this.getRandomAyat();
+            const quote = this.getRandomQuote();
 
             let message = `*Hai Teman-Teman 👋*\n`;
             
@@ -224,15 +284,9 @@ class SholatScheduler {
             }
             
             message += `\`Kota :\` *${kota.toUpperCase()}*\n\n`;
-            message += `بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ\n`;
-            
-            if (ayatData) {
-                message += `${ayatData.ayat.arab}\n\n`;
-                message += `_"${ayatData.ayat.indonesia}"_\n`;
-                message += `_(QS. ${ayatData.surah} ${ayatData.nomor}:${ayatData.ayat.ayat})_`;
-            }
+            message += `> ${quote}`;
 
-            const sent = await this.sock.sendMessage(groupJid, {
+            const messageData = {
                 text: message,
                 contextInfo: {
                     externalAdReply: {
@@ -243,10 +297,9 @@ class SholatScheduler {
                         renderLargerThumbnail: true
                     }
                 }
-            });
+            };
 
-            console.log(`[SCHEDULER] Sent ${nama} reminder to ${groupJid}`);
-            return sent.key;
+            return await this.sendWithRetry(groupJid, messageData, nama);
         } catch (error) {
             console.error(`[SCHEDULER] Failed to send reminder:`, error.message);
             return null;
@@ -256,16 +309,14 @@ class SholatScheduler {
     async sendDhuhaReminder(groupJid, waktu, kota) {
         try {
             let message = `🕌 *WAKTU DHUHA*\n\n`;
-            message += `_Bagi yang ingin sholat Dhuha, waktu sudah menunjukkan pukul_ \`${waktu}\`\n`;
-            message += `\`Lokasi :\` ${kota.toUpperCase()}`;
+            message += `> _Bagi yang ingin sholat Dhuha, waktu sudah menunjukkan pukul_ \`${waktu}\`\n`;
+            message += `> _Lokasi_ : *${kota.toUpperCase()}*`;
 
-            await this.sock.sendMessage(groupJid, {
-                text: message
-            });
-
-            console.log(`[SCHEDULER] Sent Dhuha reminder to ${groupJid}`);
+            const messageData = { text: message };
+            return await this.sendWithRetry(groupJid, messageData, 'Dhuha');
         } catch (error) {
-            console.error(`[SCHEDULER] Failed to send Dhuha reminder:`, error.message);
+            console.error(`[SCHEDULER] Failed to send Dhuha reminder:`, error.message, error.stack);
+            return null;
         }
     }
 
@@ -280,21 +331,15 @@ class SholatScheduler {
             }
 
             const banner = this.getRandomBanner();
-            const ayatData = await this.getRandomAyat();
+            const quote = this.getRandomQuote();
 
             let message = `*Hai Teman-Teman 👋*\n`;
             message += `*Sudah Masuk Waktu Sholat SUBUH*\n\n`;
             message += `\`Jam :\` *${waktu}*\n`;
             message += `\`Kota :\` *${kota.toUpperCase()}*\n\n`;
-            message += `بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ\n`;
-            
-            if (ayatData) {
-                message += `${ayatData.ayat.arab}\n\n`;
-                message += `_"${ayatData.ayat.indonesia}"_\n`;
-                message += `_(QS. ${ayatData.surah} ${ayatData.nomor}:${ayatData.ayat.ayat})_`;
-            }
+            message += `> ${quote}`;
 
-            await this.sock.sendMessage(groupJid, {
+            const messageData = {
                 text: message,
                 contextInfo: {
                     externalAdReply: {
@@ -305,8 +350,9 @@ class SholatScheduler {
                         renderLargerThumbnail: true
                     }
                 }
-            });
+            };
 
+            await this.sendWithRetry(groupJid, messageData, 'Subuh');
             console.log(`[SCHEDULER] Deleted Imsak and sent Subuh for ${groupJid}`);
         } catch (error) {
             console.error(`[SCHEDULER] Failed to delete and send Subuh:`, error.message);

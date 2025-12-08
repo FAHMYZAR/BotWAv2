@@ -10,6 +10,8 @@ class Config {
         this.numverifyApiKey = '017ef96ffa4304daf559d83cfd94a166';
         this.lolhumanApiKey = 'cbb3c99f55a4887898a53b6c';
         this.resitaApiKey = 'keysita_17dY17dY';
+        this.geminiApiKey = 'AIzaSyCDAia23O4TnUAS1hEHesIXpY7uUVrj7p8';
+
         
         // RAISING Credentials
         this.raising = {
@@ -26,7 +28,9 @@ class Config {
             youtube: 'https://api.apakah.my.id/api/v1',
             youtubev2: 'https://ytv2.apakah.my.id',
             instagram: 'https://ig.apakah.my.id',
-            candaan: 'https://candaan-api.vercel.app/api'
+            candaan: 'https://candaan-api.vercel.app/api',
+            gemini: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+
         };
     }
 

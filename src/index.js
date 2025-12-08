@@ -108,6 +108,7 @@ async function connectToWhatsApp() {
             
             // Start sholat scheduler
             const scheduler = new SholatScheduler(sock);
+            scheduler.isConnected = true; // Set true karena connection sudah open
             scheduler.start();
             
             // Initialize greetings handler

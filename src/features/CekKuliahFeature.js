@@ -3,7 +3,15 @@ const fetchJadwalKuliah = require('../utils/KuliahHelper');
 
 class CekKuliahFeature extends BaseFeature {
     constructor() {
-        super('cekkuliah', 'Cek jadwal kuliah & ujian hari ini', false);
+        super('cekkuliah', 'Cek jadwal kuliah & ujian hari ini atau hari tertentu', false);
+    }
+
+    getDayNumber(dayName) {
+        const days = {
+            'minggu': 0, 'senin': 1, 'selasa': 2, 'rabu': 3,
+            'kamis': 4, 'jumat': 5, 'sabtu': 6
+        };
+        return days[dayName.toLowerCase()];
     }
 
     removeGelar(nama) {
@@ -41,8 +49,27 @@ class CekKuliahFeature extends BaseFeature {
 
             const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const now = new Date();
-            const today = now.getDay();
-            const todayName = days[today];
+            
+            // Check if user specified a day
+            let targetDay, targetDayName;
+            if (args.length > 0) {
+                const dayNumber = this.getDayNumber(args[0]);
+                if (dayNumber === undefined) {
+                    await sock.sendMessage(m.key.remoteJid, {
+                        react: { text: '', key: m.key }
+                    });
+                    await sock.sendMessage(m.key.remoteJid, { 
+                        text: '❌ Nama hari tidak valid!\n\nContoh:\n> .cekkuliah senin\n> .cekkuliah jumat' 
+                    });
+                    return;
+                }
+                targetDay = dayNumber;
+                targetDayName = days[dayNumber];
+            } else {
+                targetDay = now.getDay();
+                targetDayName = days[targetDay];
+            }
+            
             const todayDate = now.toISOString().split('T')[0];
 
             // Process Kuliah with deduplication
@@ -54,7 +81,7 @@ class CekKuliahFeature extends BaseFeature {
                     k.day_of_week_number === j.day_of_week_number
                 )
             );
-            const kuliahHariIni = uniqueKuliah.filter(j => j.day_of_week_number == today);
+            const kuliahHariIni = uniqueKuliah.filter(j => j.day_of_week_number == targetDay);
 
             // Process Ujian
             const ujianList = Array.isArray(data.ujian) ? data.ujian : (data.ujian.data || []);
@@ -70,12 +97,12 @@ class CekKuliahFeature extends BaseFeature {
                     react: { text: '', key: m.key }
                 });
                 await sock.sendMessage(m.key.remoteJid, { 
-                    text: `📅 *JADWAL ${todayName.toUpperCase()}, ${formattedDate}*\n\n✅ Tidak ada jadwal hari ini!` 
+                    text: `📅 *JADWAL ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n✅ Tidak ada jadwal!` 
                 });
                 return;
             }
 
-            let message = `📅 *JADWAL ${todayName.toUpperCase()}, ${formattedDate}*\n\n`;
+            let message = `📅 *JADWAL ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n`;
 
             // Tampilkan Kuliah jika ada
             if (kuliahHariIni.length > 0) {
