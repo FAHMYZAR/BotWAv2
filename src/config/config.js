@@ -2,22 +2,22 @@ class Config {
     constructor() {
         this.ownerPrefix = '/';
         this.userPrefix = '.';
-        this.ownerNumber = '6285226166485';
-        this.ownerNumberFormatted = '6285226166485@c.us';
+        this.ownerNumber = '621';
+        this.ownerNumberFormatted = '621@c.us';
         this.mode = 'private'; // 'public' or 'private'
         
         // API Keys
-        this.numverifyApiKey = '017ef96ffa4304daf559d83cfd94a166';
-        this.lolhumanApiKey = 'cbb3c99f55a4887898a53b6c';
-        this.resitaApiKey = 'keysita_17dY17dY';
-        this.geminiApiKey = 'AIzaSyCDAia23O4TnUAS1hEHesIXpY7uUVrj7p8';
+        this.numverifyApiKey = 'xx';
+        this.lolhumanApiKey = 'xx';
+        this.resitaApiKey = 'xx';
+        this.geminiApiKey = 'xxxx';
 
         
         // RAISING Credentials
         this.raising = {
-            nim: '243200330',
-            password: 'Pass243200330',
-            baseUrl: 'https://raising.almaata.ac.id'
+            nim: 'xx',
+            password: 'xxxx',
+            baseUrl: 'xxxxx'
         };
         
         // External APIs
@@ -25,9 +25,9 @@ class Config {
             catbox: 'https://catbox.moe/user/api.php',
             lolhuman: 'https://api.lolhuman.xyz/api',
             resita: 'https://api.ferdev.my.id',
-            youtube: 'https://api.apakah.my.id/api/v1',
-            youtubev2: 'https://ytv2.apakah.my.id',
-            instagram: 'https://ig.apakah.my.id',
+            youtube: 'https://api.my.id/api/v1',
+            youtubev2: 'https://ytv2.my.id',
+            instagram: 'https://ig.my.id',
             candaan: 'https://candaan-api.vercel.app/api',
             gemini: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
 
