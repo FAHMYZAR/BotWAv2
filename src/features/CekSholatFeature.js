@@ -151,9 +151,8 @@ class CekSholatFeature extends BaseFeature {
             const sourceUrl = `${this.baseUrl}/${this.slugify(label)}`;
             const countdown = activePrayer?.time ? this.getCountdown(activePrayer.time) : '';
 
-            let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n`;
-            message += `Source: ${sourceUrl}\n\n`;
-            message += `*Jadwal*\n`;
+            let message = `*Jadwal Sholat untuk ${String(label).toUpperCase()}*\n\n`;
+            message += `Source: ${sourceUrl}\n`;
             message += `› Tanggal: ${jadwal.tanggal}\n`;
             message += `› Subuh: ${jadwal.subuh}\n`;
             message += `› Terbit: ${jadwal.terbit}\n`;
@@ -168,44 +167,7 @@ class CekSholatFeature extends BaseFeature {
 
             console.log('[CEKSHOLAT] Sending message...');
             await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
-            
-            // Konfigurasi Banner AdReply
-            const contextInfo = {
-                externalAdReply: {
-                    title: `Jadwal Sholat ${label}`,
-                    body: jadwal.tanggal,
-                    sourceUrl: sourceUrl,
-                    renderLargerThumbnail: true
-                }
-            };
-
-            try {
-                await sock.sendMessage(m.key.remoteJid, {
-                    interactiveMessage: {
-                        body: { text: `${message}\n` },
-                        footer: { text: 'Jadwal sholat untuk kabupaten/kota' },
-                        contextInfo: contextInfo,
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: 'cta_url',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: 'Buka Web',
-                                        url: sourceUrl
-                                    })
-                                }
-                            ],
-                            messageParamsJson: ''
-                        }
-                    }
-                });
-            } catch (interactiveError) {
-                console.log('[CEKSHOLAT] Interactive failed, fallback text:', interactiveError.message);
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: message,
-                    contextInfo: contextInfo
-                });
-            }
+            await sock.sendMessage(m.key.remoteJid, { text: message });
             console.log('[CEKSHOLAT] Message sent');
         } catch (error) {
             console.error('CekSholat error:', error.message, error.stack);
