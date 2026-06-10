@@ -164,18 +164,24 @@ class CekSholatFeature extends BaseFeature {
 
             const banner = this.getRandomBanner();
 
-            await sock.sendMessage(m.key.remoteJid, {
-                text: message,
-                contextInfo: {
-                    externalAdReply: {
-                        title: `Jadwal Sholat ${label}`,
-                        body: jadwal.tanggal,
-                        thumbnailUrl: banner,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
+            try {
+                await sock.sendMessage(m.key.remoteJid, {
+                    text: message,
+                    contextInfo: {
+                        externalAdReply: {
+                            title: `Jadwal Sholat ${label}`,
+                            body: jadwal.tanggal,
+                            thumbnailUrl: banner,
+                            sourceUrl: 'https://jadwal-sholat.kompas.com',
+                            mediaType: 1,
+                            renderLargerThumbnail: true
+                        }
                     }
-                }
-            });
+                });
+            } catch (adError) {
+                console.log('Kirim dengan banner gagal, mencoba kirim teks saja:', adError.message);
+                await sock.sendMessage(m.key.remoteJid, { text: message });
+            }
         } catch (error) {
             console.error('CekSholat error:', error.message);
             await sock.sendMessage(m.key.remoteJid, {
