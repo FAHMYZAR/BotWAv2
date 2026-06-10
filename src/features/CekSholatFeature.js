@@ -139,11 +139,8 @@ class CekSholatFeature extends BaseFeature {
             });
 
             const { label, page } = await this.resolveCity(kota);
-            console.log('[CEKSHOLAT] Resolved label:', label);
             const jadwal = this.extractTodaySchedule(page);
             const activePrayer = this.extractActivePrayer(page);
-            console.log('[CEKSHOLAT] Jadwal:', jadwal);
-            console.log('[CEKSHOLAT] Active:', activePrayer);
 
             if (!jadwal) {
                 await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
@@ -153,7 +150,6 @@ class CekSholatFeature extends BaseFeature {
 
             const sourceUrl = `${this.baseUrl}/${this.slugify(label)}`;
             const countdown = activePrayer?.time ? this.getCountdown(activePrayer.time) : '';
-            const banner = this.getRandomBanner();
 
             let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n`;
             message += `Source: ${sourceUrl}\n\n`;
@@ -178,9 +174,7 @@ class CekSholatFeature extends BaseFeature {
                 externalAdReply: {
                     title: `Jadwal Sholat ${label}`,
                     body: jadwal.tanggal,
-                    thumbnailUrl: banner,
                     sourceUrl: sourceUrl,
-                    mediaType: 1,
                     renderLargerThumbnail: true
                 }
             };
