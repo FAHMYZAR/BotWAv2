@@ -139,15 +139,25 @@ class SholatScheduler {
             if (nama === 'Imsak') msg = `*Hai Teman-Teman 👋*\n*Sekedar Mengingatkan Waktu Imsak*\n*Sebentar Lagi Subuh, Ayo Siap-Siap! 🕌*\n\n\`Imsak :\` *${waktu}*\n\`Subuh :\` *${subuhTime}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Semoga Allah memberikan kemudahan dalam ibadah kita_ 🤲`;
             if (nama === 'Maghrib') msg = `*Hai Teman-Teman 👋*\n*Sekedar Mengingatkan Waktu Sholat ${nama.toUpperCase()}*\n*Ayo Buruan Sholat Keburu Isya! ⏰*\n\n\`Jam :\` *${waktu}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Semoga Allah memberikan kemudahan dalam ibadah kita_ 🤲`;
             if (nama === 'Dzuhur' && isFriday) msg = `*Hai Teman-Teman 👋*\n*Sekedar Mengingatkan Sholat Jumat*\n*Ayo Jumatan Teman-Teman! 🕌*\n\n\`Jam :\` *${waktu}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Jangan lupa sholat Jumat ya, semoga berkah dan diterima ibadahnya_ 🤲`;
+
+            const slug = kota.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            const sourceUrl = `https://jadwal-sholat.kompas.com/${slug}`;
+
             const sent = await this.sock.sendMessage(jid, {
-                text: msg,
-                contextInfo: {
-                    externalAdReply: {
-                        title: `Waktu Sholat ${nama}`,
-                        body: `${kota} - ${waktu}`,
-                        thumbnailUrl: bannerUrl,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
+                interactiveMessage: {
+                    title: `${msg}\n`,
+                    footer: '© EL-RUWET TEAM',
+                    thumbnail: bannerUrl,
+                    nativeFlowMessage: {
+                        buttons: [
+                            {
+                                name: 'cta_url',
+                                buttonParamsJson: JSON.stringify({
+                                    display_text: 'Source Jadwal',
+                                    url: sourceUrl
+                                })
+                            }
+                        ]
                     }
                 }
             });

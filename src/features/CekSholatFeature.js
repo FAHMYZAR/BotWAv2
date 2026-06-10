@@ -169,7 +169,7 @@ class CekSholatFeature extends BaseFeature {
 
             let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n\n`;
             message += `*Jadwal*\n`;
-            message += `› Tanggal: ${jadwal.tanggal}\n`;
+            message += `*Tanggal: ${jadwal.tanggal}*\n`;
             message += `› Subuh: ${jadwal.subuh}\n`;
             message += `› Terbit: ${jadwal.terbit}\n`;
             message += `› Dzuhur: ${jadwal.dzuhur}\n`;
@@ -178,7 +178,7 @@ class CekSholatFeature extends BaseFeature {
             message += `› Isya: ${jadwal.isya}`;
 
             if (activePrayer?.time) {
-                message += `\n_Menuju ${activePrayer.name} ${countdown}_`;
+                message += `\n\n_Menuju ${activePrayer.name} ${countdown}_`;
             }
 
             console.log('[CEKSHOLAT] Sending interactive message...');
@@ -187,7 +187,7 @@ class CekSholatFeature extends BaseFeature {
             try {
                 await sock.sendMessage(m.key.remoteJid, {
                     interactiveMessage: {
-                        title: `${message}\n`,
+                        title: `${message}`,
                         footer: '© EL-RUWET TEAM',
                         thumbnail: banner,
                         nativeFlowMessage: {
