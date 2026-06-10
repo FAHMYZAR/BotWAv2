@@ -1,24 +1,11 @@
 const BaseFeature = require('../core/BaseFeature');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const config = require('../config/config');
 
 class CekSholatFeature extends BaseFeature {
     constructor() {
         super('ceksholat', 'Cek jadwal sholat kota di Indonesia', false, 'info');
-        this.banners = config.sholatBanners;
-        this.lastBannerIndex = -1;
         this.baseUrl = 'https://jadwal-sholat.kompas.com';
-    }
-
-    getRandomBanner() {
-        let index;
-        do {
-            index = Math.floor(Math.random() * this.banners.length);
-        } while (index === this.lastBannerIndex && this.banners.length > 1);
-
-        this.lastBannerIndex = index;
-        return this.banners[index];
     }
 
     slugify(text) {
@@ -32,6 +19,7 @@ class CekSholatFeature extends BaseFeature {
 
     async fetchPage(slug = '') {
         const url = slug ? `${this.baseUrl}/${slug}` : this.baseUrl;
+        console.log('[CEKSHOLAT] Fetch page:', url);
         const response = await axios.get(url, {
             timeout: 15000,
             headers: {
@@ -46,9 +34,7 @@ class CekSholatFeature extends BaseFeature {
         $('select.js-imsak option').each((_, el) => {
             const value = $(el).attr('value');
             const text = $(el).text().trim();
-            if (value && text) {
-                cities.push({ value, text });
-            }
+            if (value && text) cities.push({ value, text });
         });
         return cities;
     }
@@ -82,9 +68,7 @@ class CekSholatFeature extends BaseFeature {
 
     extractActivePrayer($) {
         const activeElement = $('.wPrayertime-table.--headline td.--active');
-        if (!activeElement.length) {
-            return null;
-        }
+        if (!activeElement.length) return null;
 
         const texts = activeElement.text().replace(/\s+/g, ' ').trim();
         const timeMatch = texts.match(/\b\d{2}:\d{2}\b/);
@@ -98,6 +82,7 @@ class CekSholatFeature extends BaseFeature {
 
     async resolveCity(kota) {
         const slug = this.slugify(kota);
+        console.log('[CEKSHOLAT] Resolve city:', kota, '->', slug);
         try {
             const page = await this.fetchPage(slug);
             const cities = this.extractCities(page);
@@ -107,9 +92,7 @@ class CekSholatFeature extends BaseFeature {
             const page = await this.fetchPage();
             const cities = this.extractCities(page);
             const matched = cities.find(city => this.slugify(city.text).includes(slug) || city.value.includes(slug));
-            if (!matched) {
-                throw new Error('Kota tidak ditemukan');
-            }
+            if (!matched) throw new Error('Kota tidak ditemukan');
             const cityPage = await this.fetchPage(matched.value);
             return { slug: matched.value, label: matched.text, page: cityPage };
         }
@@ -118,6 +101,7 @@ class CekSholatFeature extends BaseFeature {
     async execute(m, sock, args) {
         try {
             const kota = args.join(' ');
+            console.log('[CEKSHOLAT] Command args:', args);
 
             if (!kota) {
                 await sock.sendMessage(m.key.remoteJid, {
@@ -131,21 +115,19 @@ class CekSholatFeature extends BaseFeature {
             });
 
             const { label, page } = await this.resolveCity(kota);
+            console.log('[CEKSHOLAT] Resolved label:', label);
             const jadwal = this.extractTodaySchedule(page);
+            const activePrayer = this.extractActivePrayer(page);
+            console.log('[CEKSHOLAT] Jadwal:', jadwal);
+            console.log('[CEKSHOLAT] Active:', activePrayer);
 
             if (!jadwal) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: '❌ Jadwal sholat tidak tersedia untuk hari ini!'
-                });
+                await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+                await sock.sendMessage(m.key.remoteJid, { text: '❌ Jadwal sholat tidak tersedia untuk hari ini!' });
                 return;
             }
 
-            const activePrayer = this.extractActivePrayer(page);
-
-            let message = `🕌 *JADWAL SHOLAT ${label.toUpperCase()}*\n`;
+            let message = `🕌 *JADWAL SHOLAT ${String(label).toUpperCase()}*\n`;
             message += `*${jadwal.tanggal}*\n\n`;
             message += `\`Subuh :\` ${jadwal.subuh}\n`;
             message += `\`Terbit :\` ${jadwal.terbit}\n`;
@@ -158,43 +140,19 @@ class CekSholatFeature extends BaseFeature {
                 message += `\n\n> _Menuju ${activePrayer.name}: ${activePrayer.time}_`;
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
-            const banner = this.getRandomBanner();
-
-            try {
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: message,
-                    contextInfo: {
-                        externalAdReply: {
-                            title: `Jadwal Sholat ${label}`,
-                            body: jadwal.tanggal,
-                            thumbnailUrl: banner,
-                            sourceUrl: 'https://jadwal-sholat.kompas.com',
-                            mediaType: 1,
-                            renderLargerThumbnail: true
-                        }
-                    }
-                });
-            } catch (adError) {
-                console.log('Kirim dengan banner gagal, mencoba kirim teks saja:', adError.message);
-                await sock.sendMessage(m.key.remoteJid, { text: message });
-            }
+            console.log('[CEKSHOLAT] Sending message...');
+            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+            await sock.sendMessage(m.key.remoteJid, { text: message });
+            console.log('[CEKSHOLAT] Message sent');
         } catch (error) {
-            console.error('CekSholat error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
+            console.error('CekSholat error:', error.message, error.stack);
+            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
             let errorMsg = '❌ Terjadi kesalahan saat mengecek jadwal sholat!';
             if (error.message === 'Kota tidak ditemukan') {
                 errorMsg = '❌ Kota tidak ditemukan! Pastikan nama kota benar.';
             } else if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
                 errorMsg = '❌ Koneksi bermasalah, coba lagi nanti!';
             }
-
             await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
         }
     }
