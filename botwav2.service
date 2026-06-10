@@ -1,0 +1,18 @@
+[Unit]
+Description=BotWAv2 WhatsApp Bot (Bun Runtime)
+After=network.target
+
+[Service]
+Type=simple
+User=fahmyzzx
+WorkingDirectory=/home/fahmyzzx/srv/BotWAv2
+EnvironmentFile=/home/fahmyzzx/srv/BotWAv2/.env
+ExecStart=/home/fahmyzzx/.bun/bin/bun run src/index.js
+Restart=always
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=botwav2
+
+[Install]
+WantedBy=multi-user.target

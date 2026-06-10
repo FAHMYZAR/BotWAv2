@@ -110,34 +110,40 @@ npm run dev
 
 ## 📝 Cara Menggunakan
 
-### Development Mode (Auto-reload)
+### Development Mode (Windows)
 ```bash
-npm run dev
+bun --watch src/index.js
 ```
 
 ### Production Mode
 ```bash
-npm start
+bun run src/index.js
 ```
 
-### Menggunakan File Lama (Backup)
+### Untuk Server (Systemd + Bun):
 ```bash
-npm run old
+# Setup service
+sudo cp botwav2.service /etc/systemd/system/
+
+# Reload dan start
+sudo systemctl daemon-reload
+sudo systemctl enable botwav2
+sudo systemctl start botwav2
+sudo systemctl status botwav2
+
+# Lihat log realtime
+sudo journalctl -u botwav2 -f
+
+# Restart
+sudo systemctl restart botwav2
 ```
 
 ## 🔧 Konfigurasi
 
-Edit `src/config/config.js`:
-
-```javascript
-class Config {
-    constructor() {
-        this.ownerPrefix = '!';
-        this.userPrefix = '.';
-        this.ownerNumber = '6285878556744';
-        this.ownerNumberFormatted = '6285878556744@c.us';
-    }
-}
+Copy `.env.example` ke `.env` lalu isi:
+```bash
+cp .env.example .env
+nano .env
 ```
 
 ## 🐛 Bug Fixes Detail
