@@ -49,6 +49,10 @@ class DaftarSholatFeature extends BaseFeature {
 
             // Register user
             await PersonalSholatSystem.register(m.key.remoteJid, cityData.lokasi);
+            
+            if (global.sholatScheduler) {
+                global.sholatScheduler.rebuild();
+            }
 
             await sock.sendMessage(m.key.remoteJid, {
                 react: { text: '✅', key: m.key }

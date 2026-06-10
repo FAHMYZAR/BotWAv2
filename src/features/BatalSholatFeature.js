@@ -16,6 +16,10 @@ class BatalSholatFeature extends BaseFeature {
             }
 
             await PersonalSholatSystem.unregister(m.key.remoteJid);
+            
+            if (global.sholatScheduler) {
+                global.sholatScheduler.rebuild();
+            }
 
             await sock.sendMessage(m.key.remoteJid, {
                 text: '✅ Reminder sholat berhasil dibatalkan.\n\nKetik *.daftarsholat <kota>* untuk daftar lagi.'

@@ -117,10 +117,12 @@ async function connectToWhatsApp() {
             store.contacts[myJid] = { id: myJid, name: myName };
             console.log('💾 Saved my contact:', myJid, '→', myName);
             
-            // Start sholat scheduler
-            const scheduler = new SholatScheduler(sock);
-            scheduler.isConnected = true; // Set true karena connection sudah open
-            scheduler.start();
+            // Start sholat scheduler globally
+            if (global.sholatScheduler) {
+                global.sholatScheduler.stop();
+            }
+            global.sholatScheduler = new SholatScheduler(sock);
+            global.sholatScheduler.start();
             
             // Initialize greetings handler
             global.greetingsHandler = new GreetingsHandler(sock);

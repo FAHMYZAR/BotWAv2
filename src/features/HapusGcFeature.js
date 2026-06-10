@@ -39,6 +39,11 @@ class HapusGcFeature extends BaseFeature {
             }
 
             await GroupSystem.unregister(groupId);
+            
+            // Rebuild scheduler timers
+            if (global.sholatScheduler) {
+                global.sholatScheduler.rebuild();
+            }
 
             await sock.sendMessage(groupId, { 
                 text: '✅ Grup berhasil dihapus dari daftar!\n\n_Fitur auto reminder dan akses owner untuk admin grup dinonaktifkan._' 

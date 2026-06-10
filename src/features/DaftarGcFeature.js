@@ -47,6 +47,11 @@ class DaftarGcFeature extends BaseFeature {
             
             await GroupSystem.register(groupId, kota, senderId);
             
+            // Rebuild scheduler timers
+            if (global.sholatScheduler) {
+                global.sholatScheduler.rebuild();
+            }
+            
             // Simpan SEMUA admin grup, bukan hanya yang daftar
             for (const adminJid of allAdmins) {
                 await GroupSystem.addGroupAdmin(groupId, adminJid);
