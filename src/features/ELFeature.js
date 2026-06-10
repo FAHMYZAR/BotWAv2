@@ -3,75 +3,6 @@ const config = require('../config/config');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const sharp = require('sharp');
 
-const EXPLICIT_WEB_SEARCH_KEYWORDS = [
-    'cari di google',
-    'cari di web',
-    'search google',
-    'search web',
-    'googling',
-    'browse',
-    'browsing',
-    'lihat di internet',
-    'cek internet',
-    'cek web',
-    'telusuri',
-    'riset online'
-];
-
-const WEB_SEARCH_KEYWORDS = [
-    'hari ini',
-    'saat ini',
-    'sekarang',
-    'terbaru',
-    'terkini',
-    'paling baru',
-    'baru-baru ini',
-    'minggu ini',
-    'bulan ini',
-    'tahun ini',
-    'real time',
-    'real-time',
-    'realtime',
-    'live',
-    'latest',
-    'current',
-    'recent',
-    'today',
-    'now',
-    'berita',
-    'news',
-    'kabar',
-    'viral',
-    'trending',
-    'harga',
-    'price',
-    'kurs',
-    'exchange rate',
-    'saham',
-    'ihsg',
-    'crypto',
-    'bitcoin',
-    'emas',
-    'cuaca',
-    'weather',
-    'jadwal',
-    'score',
-    'skor',
-    'hasil pertandingan',
-    'klasemen',
-    'ranking',
-    'rilis',
-    'release',
-    'update',
-    'cve',
-    'vulnerability',
-    'cek apakah',
-    'benarkah',
-    'sumbernya',
-    'referensi',
-    'source'
-];
-
 function getCurrentJakartaDateTime() {
     return new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta',
@@ -511,80 +442,49 @@ class ELFeature extends BaseFeature {
         return null;
     }
 
-    async needsWebSearch(prompt, client) {
-        const normalizedPrompt = String(prompt || '').toLowerCase();
-
-        if (EXPLICIT_WEB_SEARCH_KEYWORDS.some((keyword) => normalizedPrompt.includes(keyword))) {
-            return true;
-        }
-
-        const decision = await client.chat([
-            {
-                role: 'system',
-                content: 'Tentukan apakah prompt user butuh web search sebelum dijawab. Balas hanya WEB_SEARCH atau DIRECT_ANSWER. Pilih WEB_SEARCH jika pertanyaan butuh data terbaru, kondisi saat ini, verifikasi fakta yang bisa berubah, atau user meminta search/google/web.'
-            },
-            {
-                role: 'user',
-                content: prompt
-            }
-        ], config.router?.queryModel);
-
-        const normalizedDecision = String(decision || '').trim().toUpperCase();
-        if (normalizedDecision === 'WEB_SEARCH') return true;
-        if (normalizedDecision === 'DIRECT_ANSWER') return false;
-
-        return WEB_SEARCH_KEYWORDS.some((keyword) => normalizedPrompt.includes(keyword));
-    }
-
-    async detectIntent(prompt, hasMediaInput, client) {
-        const text = String(prompt || '').toLowerCase();
-        
-        if (/(cari|carikan|info|berita|saham|kurs|harga|cuaca|dollar|ihsg|terkini|terbaru|hari ini)/.test(text)) {
-            if (!/(bikin|buat|jadikan|ubah|edit)/.test(text)) {
-                return { mode: 'chat', refined_prompt: prompt, size: '1024x1024' };
-            }
-        }
-
+    async detectIntentAndSearch(prompt, hasMediaInput, client) {
         const raw = await client.chat([
             {
                 role: 'system',
                 content: [
-                    'Kamu bertugas mengklasifikasikan intent user untuk bot AI.',
-                    'Balas hanya JSON valid tanpa markdown.',
-                    'Field wajib: mode, refined_prompt, size.',
-                    'mode hanya boleh salah satu: chat, analyze, generate_image, generate_sticker, edit_image, edit_sticker, tool_call.',
-                    'Gunakan "chat" untuk pertanyaan umum.',
-                    'Pilih "tool_call" JIKA user minta jadikan sticker (contoh: "jadikan stiker", "bikin stiker dari foto ini") atau jadikan gambar (contoh: "jadikan gambar", "ubah stiker ini jadi foto").',
-                    'Jika user minta bikin gambar/ilustrasi baru dari teks, pilih generate_image.',
-                    'Jika user minta bikin sticker/stiker baru dari teks, pilih generate_sticker.',
-                    'Jika ada media input dan user minta mengubah isi/media, pilih edit_image atau edit_sticker.',
-                    'Jika ada media input dan user hanya bertanya/menjelaskan isi media, pilih analyze.',
-                    `Kalau has_media_input=${hasMediaInput ? 'true' : 'false'}.`,
-                    'Untuk size, gunakan orientasi aman 1024x1024 kecuali disebut potrait/landscape.'
-                ].join(' ')
+                    'Kamu bertugas mengklasifikasikan intent user dan menentukan apakah butuh pencarian web.',
+                    'Balas HANYA dengan JSON valid.',
+                    'Format JSON:',
+                    '{ "mode": "chat|analyze|generate_image|generate_sticker|edit_image|edit_sticker|tool_call", "needs_search": true|false, "refined_prompt": "query untuk di-search atau prompt untuk LLM", "size": "1024x1024|1024x1536|1536x1024" }',
+                    'Aturan "mode":',
+                    '- "chat" untuk pertanyaan umum.',
+                    '- "analyze" jika user bertanya isi/gambar media input.',
+                    '- "generate_image"/"generate_sticker" jika user minta buat baru dari teks.',
+                    '- "edit_image"/"edit_sticker" jika ada media input dan user minta ubah konten visualnya.',
+                    '- "tool_call" JIKA user minta konversi format biasa: "jadikan stiker", "ubah foto ke stiker", "jadikan gambar", "ubah stiker ke foto".',
+                    `has_media_input=${hasMediaInput}.`,
+                    'Aturan "needs_search":',
+                    'Wajib true JIKA pertanyaan butuh fakta terbaru, berita, cuaca, harga saham, kurs, jadwal, waktu rilis, skor, atau referensi faktual yang bisa berubah. Selain itu false.'
+                ].join('\n')
             },
             { role: 'user', content: prompt }
-        ], config.router?.queryModel);
+        ], config.router?.queryModel || 'fastcombo');
 
         const match = String(raw || '').match(/\{[\s\S]*\}/);
-        if (!match) return { mode: hasMediaInput ? 'analyze' : 'chat', refined_prompt: prompt, size: '1024x1024' };
+        if (!match) return { mode: hasMediaInput ? 'analyze' : 'chat', needs_search: false, refined_prompt: prompt, size: '1024x1024' };
 
         try {
             const parsed = JSON.parse(match[0]);
             const allowed = new Set(['chat', 'analyze', 'generate_image', 'generate_sticker', 'edit_image', 'edit_sticker', 'tool_call']);
             const mode = allowed.has(parsed.mode) ? parsed.mode : 'chat';
             const refined = String(parsed.refined_prompt || prompt).trim() || prompt;
+            const needs_search = Boolean(parsed.needs_search);
             
             let size = String(parsed.size || '').trim().toLowerCase();
             if (!/^\d+x\d+$/.test(size)) {
-                if (['portrait', 'potrait', 'vertical', 'vertikal', 'story'].includes(size)) size = '1024x1536';
-                else if (['landscape', 'horizontal', 'banner', 'wide'].includes(size)) size = '1536x1024';
+                if (['portrait', 'potrait', 'vertical'].includes(size)) size = '1024x1536';
+                else if (['landscape', 'horizontal', 'banner'].includes(size)) size = '1536x1024';
                 else size = config.agnes?.imageSize || '1024x1024';
             }
 
-            return { mode, refined_prompt: refined, size };
+            return { mode, needs_search, refined_prompt: refined, size };
         } catch {
-            return { mode: hasMediaInput ? 'analyze' : 'chat', refined_prompt: prompt, size: '1024x1024' };
+            return { mode: hasMediaInput ? 'analyze' : 'chat', needs_search: false, refined_prompt: prompt, size: '1024x1024' };
         }
     }
 
@@ -621,38 +521,34 @@ class ELFeature extends BaseFeature {
         await this.finishStatus(sock, remoteJid, statusMessage, 'Selesai.', m);
     }
 
-    async handleChat(sock, remoteJid, statusMessage, startMs, finalPrompt, client) {
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Memahami pertanyaan...');
-        const shouldSearch = await this.needsWebSearch(finalPrompt, client);
-        let googleRaw = null;
+    async handleChat(sock, remoteJid, statusMessage, startMs, finalPrompt, client, intent) {
+        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Menyusun jawaban...');
+        let rawAnswer = null;
 
-        if (!shouldSearch) {
-            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Menyusun jawaban...');
-            googleRaw = await client.chat(buildDirectAnswerMessages(finalPrompt));
-        } else {
+        if (intent?.needs_search) {
             await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Coba Google AI search...');
-            googleRaw = await getGoogleAiSearchData(finalPrompt);
+            rawAnswer = await getGoogleAiSearchData(intent.refined_prompt || finalPrompt);
 
-            if (!googleRaw) {
+            if (!rawAnswer) {
                 await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Google AI gagal, fallback search...');
-                const firstSearch = await client.search(finalPrompt, 5);
-                const refinedQuery = String(await client.chat(buildRefineMessages(finalPrompt, firstSearch), config.router?.queryModel)).trim().replace(/^"|"$/g, '');
-                const finalSearch = await client.search(refinedQuery || finalPrompt, 8);
-                googleRaw = await client.chat(buildAnswerMessages(finalPrompt, finalSearch));
+                const searchData = await client.search(intent.refined_prompt || finalPrompt, 8);
+                rawAnswer = await client.chat(buildAnswerMessages(finalPrompt, searchData), config.router?.chatModel || 'vpscombo');
             }
+        } else {
+            rawAnswer = await client.chat([
+                {
+                    role: 'system',
+                    content: buildSystemInstruction() + '\n\nJawab langsung, singkat, natural, dan to the point.'
+                },
+                {
+                    role: 'user',
+                    content: finalPrompt
+                }
+            ], config.router?.chatModel || 'vpscombo');
         }
 
         await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan jawaban...');
-        let output = normalizeOutput(await client.chat([
-            {
-                role: 'system',
-                content: buildSystemInstruction() + '\n\nFormat ulang data berikut agar rapi sesuai gaya bahasa EL-RUWET AI, to the point, dan langsung menjawab pertanyaan.'
-            },
-            {
-                role: 'user',
-                content: `Pertanyaan: ${finalPrompt}\n\nData mentah:\n${googleRaw}`
-            }
-        ], config.router?.chatModel || 'vpscombo'));
+        let output = normalizeOutput(rawAnswer);
 
         if (!output) {
             const retryAnswer = await client.chat([
@@ -732,11 +628,10 @@ class ELFeature extends BaseFeature {
 
             const client = new RouterClient();
             const remoteJid = m.key.remoteJid;
-            await sock.sendMessage(remoteJid, { react: { text: '💎', key: m.key } });
             statusMessage = await this.sendStatus(sock, remoteJid, m, startMs, 'Memahami permintaan...');
 
             const userPrompt = prompt || 'Jelaskan isi media ini secara ringkas dan jelas.';
-            const intent = await this.detectIntent(userPrompt, Boolean(imageInput), client);
+            const intent = await this.detectIntentAndSearch(userPrompt, Boolean(imageInput), client);
 
             if (intent.mode === 'analyze') {
                 await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Media terdeteksi, membaca gambar...');
@@ -763,7 +658,7 @@ class ELFeature extends BaseFeature {
                 await this.handleToolCall(sock, remoteJid, m, statusMessage, startMs, intent.refined_prompt);
             }
             else {
-                const output = await this.handleChat(sock, remoteJid, statusMessage, startMs, buildFinalPrompt(intent.refined_prompt), client);
+                const output = await this.handleChat(sock, remoteJid, statusMessage, startMs, buildFinalPrompt(intent.refined_prompt), client, intent);
                 await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
                 await this.finishStatus(sock, remoteJid, statusMessage, output, this.getQuotedContextInfo(m));
             }
