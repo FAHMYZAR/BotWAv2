@@ -4,7 +4,7 @@ const axios = require('axios');
 
 class GetContactFeature extends BaseFeature {
     constructor() {
-        super('getcontact', 'Cek info nomor telepon', false);
+        super('getcontact', 'Cek info nomor telepon', false, 'tools');
     }
 
     async execute(m, sock, args) {
@@ -61,7 +61,7 @@ class GetContactFeature extends BaseFeature {
                 message += `\n`;
             }
 
-            message += `_🔥 FAHMYZZX-BOT © ${new Date().getFullYear()}_`;
+            message += `_🔥 EL-RUWET [BOT + AI] © ${new Date().getFullYear()}_`;
 
             // Kirim dengan profile pic sebagai banner jika ada
             if (whatsapp?.profilePicUrl) {

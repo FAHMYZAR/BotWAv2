@@ -2,7 +2,7 @@ const BaseFeature = require('../core/BaseFeature');
 
 class PingFeature extends BaseFeature {
     constructor() {
-        super('ping', 'Cek response time bot', false);
+        super('ping', 'Cek response time bot', false, 'tools');
     }
 
     async execute(m, sock, args) {

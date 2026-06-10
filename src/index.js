@@ -33,15 +33,27 @@ const commandHandler = require('./core/CommandHandler');
 const KeynoteFeature = require('./features/KeynoteFeature');
 const SholatScheduler = require('./utils/SholatScheduler');
 const GreetingsHandler = require('./utils/GreetingsHandler');
+const Database = require('./utils/Database');
+const ProtectionSystem = require('./utils/ProtectionSystem');
+const MessageTracker = require('./utils/MessageTracker');
 
-// Auto-load all features
-const featuresDir = path.join(__dirname, 'features');
-featureRegistry.autoLoadFeatures(featuresDir);
+async function initializeBot() {
+    console.log('🚀 EL-RUWET [BOT + AI] Starting...');
+    
+    await Database.connect();
+    
+    // Auto-load all features AFTER database is connected
+    const featuresDir = path.join(__dirname, 'features');
+    featureRegistry.autoLoadFeatures(featuresDir);
+    
+    console.log(`📦 Loaded ${featureRegistry.features.size} features`);
+}
 
-console.log('🚀 FAHMYZZX-BotWa Starting...');
-console.log(`📦 Loaded ${featureRegistry.features.size} features`);
+// Initialize bot
+initializeBot().catch(console.error);
 
 const keynoteFeature = new KeynoteFeature();
+
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
@@ -50,12 +62,11 @@ async function connectToWhatsApp() {
     const sock = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false,
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
         },
-        browser: ['FAHMYZZX-Bot', 'Chrome', '3.0'],
+        browser: ['EL-RUWET [BOT + AI]', 'Chrome', '3.0'],
         markOnlineOnConnect: true
     });
 
@@ -118,17 +129,58 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 
+    sock.ev.on('groups.update', async (updates) => {
+        try {
+            for (const update of updates) {
+                const GroupSystem = require('./utils/GroupSystem');
+                const registeredGroup = await GroupSystem.get(update.id);
+                
+                if (registeredGroup) {
+                    // Auto-sync admin saat ada update grup
+                    try {
+                        const metadata = await sock.groupMetadata(update.id);
+                        const allAdmins = metadata.participants
+                            .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+                            .map(p => p.id);
+                        
+                        // Update group admins in MongoDB
+                        for (const adminJid of allAdmins) {
+                            await GroupSystem.addGroupAdmin(update.id, adminJid);
+                        }
+                    } catch (err) {
+                        console.error('Auto-sync on group update error:', err.message);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Groups update error:', error.message);
+        }
+    });
+
     sock.ev.on('group-participants.update', async (update) => {
         try {
             const { id, participants, action } = update;
+            const GroupSystem = require('./utils/GroupSystem');
+            const registeredGroup = await GroupSystem.get(id);
             
-            // Cek apakah grup terdaftar
-            const GroupRegistry = require('./utils/GroupRegistry');
-            const registeredGroup = GroupRegistry.get(id);
-            if (!registeredGroup) {
-                return; // Ignore grup yang tidak terdaftar
+            // Auto-sync admin jika ada promote/demote di grup terdaftar
+            if (registeredGroup && (action === 'promote' || action === 'demote')) {
+                try {
+                    const metadata = await sock.groupMetadata(id);
+                    const allAdmins = metadata.participants
+                        .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+                        .map(p => p.id);
+                    
+                    // Update group admins in MongoDB
+                    for (const adminJid of allAdmins) {
+                        await GroupSystem.addGroupAdmin(id, adminJid);
+                    }
+                } catch (err) {
+                    console.error('Auto-sync admin error:', err.message);
+                }
             }
             
+            // Greeting untuk semua grup (tidak perlu terdaftar)
             if (action === 'add') {
                 await global.greetingsHandler.handleJoin(id, participants);
             } else if (action === 'remove') {
@@ -155,6 +207,31 @@ async function connectToWhatsApp() {
             const isFromMe = m.key.fromMe;
             const remoteJid = m.key.remoteJid;
             const sender = m.key.participant || m.key.remoteJid;
+
+            // Store message for undelete feature (only non-bot messages)
+            if (!isFromMe && messageText) {
+                const senderName = m.pushName || store.contacts[sender]?.name || sender.split('@')[0];
+                let mediaType = null;
+                
+                if (m.message.imageMessage) mediaType = 'Image';
+                else if (m.message.videoMessage) mediaType = 'Video';
+                else if (m.message.audioMessage) mediaType = 'Audio';
+                else if (m.message.documentMessage) mediaType = 'Document';
+                else if (m.message.stickerMessage) mediaType = 'Sticker';
+                
+                // Store in background without blocking
+                setImmediate(() => {
+                    MessageTracker.addDeletedMessage(remoteJid, {
+                        messageId: m.key.id,
+                        sender: sender,
+                        senderName: senderName,
+                        text: messageText,
+                        caption: m.message.imageMessage?.caption || m.message.videoMessage?.caption,
+                        mediaType: mediaType,
+                        timestamp: m.messageTimestamp
+                    });
+                });
+            }
 
             // Save contact HANYA dari message yang BUKAN dari kita
             // Karena pushName di message kita adalah nama kita, bukan nama lawan
@@ -184,17 +261,17 @@ async function connectToWhatsApp() {
             }
 
             // Check if owner
-            const isOwner = isFromMe || sender.replace('@s.whatsapp.net', '') === config.ownerNumber;
+            const isRealOwner = isFromMe || sender.replace('@s.whatsapp.net', '') === config.ownerNumber;
+            let isOwner = isRealOwner;
             const isGroup = remoteJid.endsWith('@g.us');
-
-            // Mode check: private mode
-            if (!config.isPublicMode() && isGroup) {
-                // Private mode: cek apakah grup terdaftar (kecuali owner)
-                if (!isOwner) {
-                    const GroupRegistry = require('./utils/GroupRegistry');
-                    const registeredGroup = GroupRegistry.get(remoteJid);
-                    if (!registeredGroup) {
-                        return; // Ignore pesan di grup yang tidak terdaftar
+            
+            // Jika di grup terdaftar, cek apakah admin grup
+            if (isGroup && !isRealOwner) {
+                const GroupSystem = require('./utils/GroupSystem');
+                const registeredGroup = await GroupSystem.get(remoteJid);
+                if (registeredGroup) {
+                    if (await GroupSystem.isGroupAdmin(remoteJid, sender)) {
+                        isOwner = true;
                     }
                 }
             }
@@ -213,14 +290,28 @@ async function connectToWhatsApp() {
             }
             
             // Check help navigation
-            if (body === '!next' || body === '!prev') {
+            if (body === '!next' || body === '!prev' || body === '!back') {
                 const helpFeature = featureRegistry.get('help');
                 if (helpFeature) {
                     if (body === '!next') {
                         await helpFeature.handleNext(m, sock);
-                    } else {
+                    } else if (body === '!prev') {
                         await helpFeature.handlePrev(m, sock);
+                    } else if (body === '!back') {
+                        await helpFeature.handleBack(m, sock);
                     }
+                    return;
+                }
+            }
+            
+            // Check help category navigation
+            if (body.startsWith('!') && body.length > 1) {
+                const category = body.substring(1).toLowerCase();
+                const helpFeature = featureRegistry.get('help');
+                const validCategories = ['admin', 'ai', 'download', 'fun', 'group', 'info', 'media', 'owner', 'tools', 'akademik'];
+                
+                if (helpFeature && validCategories.includes(category)) {
+                    await helpFeature.handleCategory(m, sock, category);
                     return;
                 }
             }
@@ -231,6 +322,81 @@ async function connectToWhatsApp() {
                 const selection = body.substring(1);
                 await ytPlayFeature.handleSelection(m, sock, selection);
                 return;
+            }
+
+            // AFK System
+            const AfkSystem = require('./utils/AfkSystem');
+            const AdminHelper = require('./utils/AdminHelper');
+            
+            // Cek apakah user yang kirim pesan sedang AFK
+            if (await AfkSystem.isAfk(sender)) {
+                const removed = await AfkSystem.removeAfk(sender);
+                if (removed) {
+                    const name = m.pushName || 'User';
+                    await sock.sendMessage(remoteJid, {
+                        text: `*${name}* sudah tidak AFK lagi`,
+                        mentions: [sender]
+                    });
+                }
+            }
+            
+            // Cek apakah ada yang mention/reply user yang AFK
+            const mentionedJid = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+            const quotedParticipant = m.message?.extendedTextMessage?.contextInfo?.participant;
+            
+            // Gabungkan mention dan quoted
+            const targetUsers = [...mentionedJid];
+            if (quotedParticipant && !targetUsers.includes(quotedParticipant)) {
+                targetUsers.push(quotedParticipant);
+            }
+            
+            // Cek setiap target apakah AFK
+            for (const targetUser of targetUsers) {
+                if (await AfkSystem.isAfk(targetUser)) {
+                    const afkData = await AfkSystem.getAfk(targetUser);
+                    const duration = await AfkSystem.getAfkDuration(targetUser);
+                    
+                    // Cek apakah target adalah admin grup
+                    let role = 'Member';
+                    if (isGroup) {
+                        const isAdmin = await AdminHelper.isGroupAdmin(sock, remoteJid, targetUser);
+                        if (isAdmin) role = 'Admin';
+                    }
+                    
+                    let message = `*${role}* @${targetUser.split('@')[0]} sedang AFK\n`;
+                    message += `Alasan: ${afkData.reason}\n`;
+                    message += `Sejak: ${duration} yang lalu`;
+                    
+                    await sock.sendMessage(remoteJid, {
+                        text: message,
+                        mentions: [targetUser]
+                    });
+                    
+                    break; // Hanya reply 1x per pesan
+                }
+            }
+
+            // Check AI commands without prefix
+            if (body.toLowerCase().startsWith('el ')) {
+                const elFeature = featureRegistry.get('el');
+                if (elFeature) {
+                    const prompt = body.substring(3).trim();
+                    if (prompt) {
+                        await elFeature.execute(m, sock, prompt.split(' '));
+                        return;
+                    }
+                }
+            }
+
+            if (body.toLowerCase().startsWith('king ')) {
+                const kingFeature = featureRegistry.get('king');
+                if (kingFeature) {
+                    const prompt = body.substring(5).trim();
+                    if (prompt) {
+                        await kingFeature.execute(m, sock, prompt.split(' '));
+                        return;
+                    }
+                }
             }
 
             if (isOwner && body.startsWith(config.ownerPrefix)) {
@@ -244,11 +410,27 @@ async function connectToWhatsApp() {
             console.error('❌ Message Handler Error:', error.message);
         }
     });
+
+    // Listen for deleted messages
+    sock.ev.on('messages.update', async (updates) => {
+        try {
+            for (const update of updates) {
+                // Check if message was deleted
+                if (update.update.message === null) {
+                    console.log('[UNDELETE] Message deleted:', update.key.id);
+                }
+            }
+        } catch (error) {
+            console.error('Messages update error:', error.message);
+        }
+    });
 }
 
 connectToWhatsApp();
 
 process.on('unhandledRejection', (err) => {
+    const isCancelled = err?.message === 'Cancelled' || (err?.isBoom && err?.output?.statusCode === 500 && err?.message === 'Cancelled');
+    if (isCancelled) return;
     console.error('❌ Unhandled rejection:', err);
 });
 

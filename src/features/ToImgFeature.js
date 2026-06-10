@@ -6,7 +6,7 @@ const path = require('path');
 
 class ToImgFeature extends BaseFeature {
     constructor() {
-        super('toimg', 'Mengonversi stiker menjadi gambar', false);
+        super('toimg', 'Mengonversi stiker menjadi gambar', false, 'media');
     }
 
     async execute(m, sock, args) {

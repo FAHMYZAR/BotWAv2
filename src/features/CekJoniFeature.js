@@ -2,7 +2,7 @@ const BaseFeature = require('../core/BaseFeature');
 
 class CekJoniFeature extends BaseFeature {
     constructor() {
-        super('cekjoni', 'Fitur lucu cek ukuran joni', false);
+        super('cekjoni', 'Fitur lucu cek ukuran joni', false, 'fun');
     }
 
     async execute(m, sock, args) {
@@ -25,21 +25,23 @@ class CekJoniFeature extends BaseFeature {
                 if (contact?.name) name = contact.name;
             } catch {}
 
-            // Progress animation
-            await sock.sendMessage(m.key.remoteJid, { 
+            // Progress animation (editable)
+            const progressMsg = await sock.sendMessage(m.key.remoteJid, { 
                 text: '🔄 *Calculating size...*\n```[▒▒▒▒▒▒▒▒▒▒] 0%```' 
             });
             
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             await sock.sendMessage(m.key.remoteJid, { 
-                text: '🔄 *Analyzing data...*\n```[██████▒▒▒▒] 60%```' 
+                text: '🔄 *Analyzing data...*\n```[██████▒▒▒▒] 60%```',
+                edit: progressMsg.key
             });
             
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             await sock.sendMessage(m.key.remoteJid, { 
-                text: '🔄 *Final calculation...*\n```[██████████] 100%```' 
+                text: '🔄 *Final calculation...*\n```[██████████] 100%```',
+                edit: progressMsg.key
             });
             
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -57,7 +59,8 @@ class CekJoniFeature extends BaseFeature {
                 text: `*Hasil perhitungan ukuran joni* ${sizeEmoji}\n\n` +
                       `*Nama:* ${name}\n` +
                       `*Ukuran Joni:* ${size}cm\n\n` +
-                      `_Awwokwokowk Ukuran Joni🍆 nya ternyata ${size}cm_🤣`
+                      `_Awwokwokowk Ukuran Joni🍆 nya ternyata ${size}cm_🤣`,
+                edit: progressMsg.key
             });
 
         } catch (error) {

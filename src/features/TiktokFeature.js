@@ -6,7 +6,7 @@ const path = require('path');
 
 class TiktokFeature extends BaseFeature {
     constructor() {
-        super('tt', 'Download video TikTok HD tanpa watermark', false);
+        super('tt', 'Download video TikTok HD tanpa watermark', false, 'download');
     }
 
     async execute(m, sock, args) {

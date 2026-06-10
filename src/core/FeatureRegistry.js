@@ -20,7 +20,8 @@ class FeatureRegistry {
             .map(([cmd, feature]) => ({
                 cmd,
                 desc: feature.description,
-                ownerOnly: feature.ownerOnly
+                ownerOnly: feature.ownerOnly,
+                category: feature.category || 'tools'
             }));
     }
 

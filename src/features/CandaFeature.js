@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class CandaFeature extends BaseFeature {
     constructor() {
-        super('canda', 'Dapatkan jokes receh random', false);
+        super('canda', 'Dapatkan jokes receh random', false, 'fun');
     }
 
     async execute(m, sock, args) {

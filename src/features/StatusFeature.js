@@ -7,7 +7,7 @@ const os = require('os');
 
 class StatusFeature extends BaseFeature {
     constructor() {
-        super('status', 'Tampilkan status system', false);
+        super('status', 'Tampilkan status system', false, 'tools');
     }
 
     async execute(m, sock, args) {
@@ -24,7 +24,7 @@ class StatusFeature extends BaseFeature {
             const projectPath = path.join(__dirname, '../../');
             const projectSize = await SystemHelper.getProjectSize(projectPath);
 
-            const bannerPath = path.join(__dirname, '../../disk/welcome.jpg');
+            const bannerPath = path.join(__dirname, '../../disk/welcome.png');
             const bannerBuffer = fs.readFileSync(bannerPath);
 
             let statusText = 
@@ -61,7 +61,7 @@ class StatusFeature extends BaseFeature {
                 statusText += `\n`;
             }
 
-            statusText += `_🔥 FAHMYZZX-BOT © ${new Date().getFullYear()}_`;
+            statusText += `_🔥 EL-RUWET [BOT + AI] © ${new Date().getFullYear()}_`;
 
             await sock.sendMessage(m.key.remoteJid, {
                 image: bannerBuffer,

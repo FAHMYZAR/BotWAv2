@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class FacebookFeature extends BaseFeature {
     constructor() {
-        super('fb', 'Download video Facebook', false);
+        super('fb', 'Download video Facebook', false, 'download');
     }
 
     async execute(m, sock, args) {

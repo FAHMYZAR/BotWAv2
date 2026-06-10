@@ -1,9 +1,9 @@
 const BaseFeature = require('../core/BaseFeature');
-const { loadKeynotes, saveKeynotes } = require('../../keynoteDB');
+const KeynoteSystem = require('../utils/KeynoteSystem');
 
 class DelNoteFeature extends BaseFeature {
     constructor() {
-        super('delnote', 'Hapus catatan', true);
+        super('delnote', 'Hapus catatan', true, 'owner');
     }
 
     async execute(m, sock, args) {
@@ -16,21 +16,25 @@ class DelNoteFeature extends BaseFeature {
             }
 
             const noteName = args[0];
-            const store = loadKeynotes();
+            const note = await KeynoteSystem.getKeynote(noteName);
 
-            // Check if note exists using hasOwnProperty (safe from prototype pollution)
-            if (!Object.prototype.hasOwnProperty.call(store.notes, noteName)) {
+            if (!note) {
                 await sock.sendMessage(m.key.remoteJid, { 
                     text: `❌ *Catatan tidak ditemukan!*\n\n📝 Nama: ${noteName}\n⚠️ Catatan tidak ada di database`
                 });
                 return;
             }
 
-            const noteContent = store.notes[noteName].content;
+            const noteContent = note.content;
             
             // Delete note
-            delete store.notes[noteName];
-            saveKeynotes(store);
+            const success = await KeynoteSystem.deleteKeynote(noteName);
+            if (!success) {
+                await sock.sendMessage(m.key.remoteJid, { 
+                    text: `❌ Gagal menghapus keynote "${noteName}"!` 
+                });
+                return;
+            }
 
             await sock.sendMessage(m.key.remoteJid, { 
                 text: `🗑️ *Catatan Berhasil Dihapus!*\n\n` +

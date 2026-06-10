@@ -5,7 +5,7 @@ const path = require('path');
 
 class BratVidFeature extends BaseFeature {
     constructor() {
-        super('bratvid', 'Membuat stiker brat video', false);
+        super('bratvid', 'Membuat stiker brat video', false, 'media');
     }
 
     async execute(m, sock, args) {

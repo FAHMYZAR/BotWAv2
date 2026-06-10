@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class YoutubeFeature extends BaseFeature {
     constructor() {
-        super('yt', 'Download video YouTube', false);
+        super('yt', 'Download video YouTube', false, 'download');
     }
 
     async execute(m, sock, args) {
@@ -90,7 +90,7 @@ class YoutubeFeature extends BaseFeature {
                 `> \`${title}\`\n\n` +
                 `*📦 SIZE*\n` +
                 `> \`${sizeInMB} MB\`\n\n` +
-                `_🔥 Downloaded by FAHMYZZX-BOT_`;
+                `_🔥 Downloaded by EL-RUWET [BOT + AI]_`;
 
             await sock.sendMessage(m.key.remoteJid, {
                 react: { text: '', key: m.key }

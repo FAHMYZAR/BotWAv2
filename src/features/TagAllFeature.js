@@ -2,7 +2,7 @@ const BaseFeature = require('../core/BaseFeature');
 
 class TagAllFeature extends BaseFeature {
     constructor() {
-        super('tagall', 'Tag semua member grup', true);
+        super('tagall', 'Tag semua member grup', false, 'group');
     }
 
     async execute(m, sock, args) {

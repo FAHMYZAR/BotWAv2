@@ -1,6 +1,6 @@
-FROM node:20-alpine
+FROM oven/bun:1-alpine
 
-# Install runtime dependencies including Sharp requirements
+# Install runtime dependencies including Sharp requirements and FFmpeg with x264
 RUN apk add --no-cache \
     gcompat \
     cairo \
@@ -10,6 +10,9 @@ RUN apk add --no-cache \
     librsvg \
     pixman \
     ffmpeg \
+    ffmpeg-libs \
+    x264-libs \
+    x264 \
     util-linux-dev \
     vips-dev \
     build-base \
@@ -19,22 +22,21 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy node_modules first (layer besar, jarang berubah)
-COPY node_modules ./node_modules
-
 # Copy package files
 COPY package*.json ./
 
-# Install Sharp for Alpine Linux
-RUN npm install --platform=linux --arch=x64 --libc=musl sharp
+# Install dependencies using Bun
+RUN bun install
 
-# Copy application code (sering berubah)
+# Copy application code
 COPY src ./src
-COPY keynoteDB.js ./
 COPY disk ./disk
+
+# Copy only required files (WhatsApp session)
+COPY baileys_store.json ./baileys_store.json
 
 # Set environment
 ENV NODE_ENV=production
 
 # Run bot
-CMD ["node", "src/index.js"]
+CMD ["bun", "run", "src/index.js"]

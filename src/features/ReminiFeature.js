@@ -8,7 +8,7 @@ const config = require('../config/config');
 
 class ReminiFeature extends BaseFeature {
     constructor() {
-        super('remini', 'Enhance kualitas gambar menjadi HD', false);
+        super('remini', 'Enhance kualitas gambar menjadi HD', false, 'media');
         this.processing = new Set();
         this.maxSize = 10 * 1024 * 1024; // 10MB
     }

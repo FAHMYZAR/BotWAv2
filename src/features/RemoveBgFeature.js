@@ -8,7 +8,7 @@ const config = require('../config/config');
 
 class RemoveBgFeature extends BaseFeature {
     constructor() {
-        super('rmbg', 'Hapus background gambar', false);
+        super('rmbg', 'Hapus background gambar', false, 'media');
         this.processing = new Set();
         this.maxSize = 10 * 1024 * 1024; // 10MB
     }

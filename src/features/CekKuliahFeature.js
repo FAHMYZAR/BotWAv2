@@ -3,7 +3,7 @@ const fetchJadwalKuliah = require('../utils/KuliahHelper');
 
 class CekKuliahFeature extends BaseFeature {
     constructor() {
-        super('cekkuliah', 'Cek jadwal kuliah & ujian hari ini atau hari tertentu', false);
+        super('cekkuliah', 'Cek jadwal kuliah hari ini atau hari tertentu', false, 'akademik');
     }
 
     getDayNumber(dayName) {
@@ -35,7 +35,21 @@ class CekKuliahFeature extends BaseFeature {
         try {
             await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
 
-            const data = await fetchJadwalKuliah();
+            let type = 'rpl'; // default to RPL
+            let dayArg = null;
+
+            if (args.length > 0) {
+                if (['rpl', 'ds'].includes(args[0].toLowerCase())) {
+                    type = args[0].toLowerCase();
+                    if (args.length > 1) {
+                        dayArg = args[1];
+                    }
+                } else {
+                    dayArg = args[0];
+                }
+            }
+
+            const data = await fetchJadwalKuliah(type);
 
             if (data.kuliah?.isHtml || data.ujian?.isHtml) {
                 await sock.sendMessage(m.key.remoteJid, {
@@ -52,14 +66,14 @@ class CekKuliahFeature extends BaseFeature {
             
             // Check if user specified a day
             let targetDay, targetDayName;
-            if (args.length > 0) {
-                const dayNumber = this.getDayNumber(args[0]);
+            if (dayArg) {
+                const dayNumber = this.getDayNumber(dayArg);
                 if (dayNumber === undefined) {
                     await sock.sendMessage(m.key.remoteJid, {
                         react: { text: '', key: m.key }
                     });
                     await sock.sendMessage(m.key.remoteJid, { 
-                        text: '❌ Nama hari tidak valid!\n\nContoh:\n> .cekkuliah senin\n> .cekkuliah jumat' 
+                        text: '❌ Nama hari tidak valid!\n\nContoh:\n> .cekkuliah rpl senin\n> .cekkuliah ds jumat' 
                     });
                     return;
                 }
@@ -83,16 +97,12 @@ class CekKuliahFeature extends BaseFeature {
             );
             const kuliahHariIni = uniqueKuliah.filter(j => j.day_of_week_number == targetDay);
 
-            // Process Ujian
-            const ujianList = Array.isArray(data.ujian) ? data.ujian : (data.ujian.data || []);
-            const ujianHariIni = ujianList.filter(u => u.tanggal_ujian === todayDate);
-
-            // Get tanggal from jadwal (prioritas kuliah, fallback ujian, fallback today)
-            const jadwalDate = kuliahHariIni[0]?.tanggal_pertemuan_presensi || ujianHariIni[0]?.tanggal_ujian || todayDate;
+            // Get tanggal from jadwal kuliah
+            const jadwalDate = kuliahHariIni[0]?.tanggal_pertemuan_presensi || todayDate;
             const formattedDate = this.formatDate(jadwalDate);
 
-            // Jika keduanya kosong
-            if (kuliahHariIni.length === 0 && ujianHariIni.length === 0) {
+            // Jika kosong
+            if (kuliahHariIni.length === 0) {
                 await sock.sendMessage(m.key.remoteJid, {
                     react: { text: '', key: m.key }
                 });
@@ -102,32 +112,23 @@ class CekKuliahFeature extends BaseFeature {
                 return;
             }
 
-            let message = `📅 *JADWAL ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n`;
+            const displayType = type === 'ds' ? 'DATA-SCIENCE' : type.toUpperCase();
+            let message = `📅 *JADWAL KULIAH ${displayType} - ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n`;
 
-            // Tampilkan Kuliah jika ada
-            if (kuliahHariIni.length > 0) {
-                message += `*KULIAH*\n`;
-                kuliahHariIni.forEach((j, i) => {
-                    message += `> _${i + 1}. ${j.nama_matakuliah}_\n`;
-                    message += `   \`Jam :\` ${j.jam_awal} - ${j.jam_akhir}\n`;
-                    message += `   \`Kelas :\` ${j.nama_ruang} | ${j.nama_kelas}\n`;
-                    message += `   \`Dosen :\` ${this.removeGelar(j.nama_dosen_pengampu_koordinator)}\n`;
-                    if (i < kuliahHariIni.length - 1) message += `\n`;
-                });
-                if (ujianHariIni.length > 0) message += `\n\n`;
-            }
-
-            // Tampilkan Ujian jika ada
-            if (ujianHariIni.length > 0) {
-                message += `*UJIAN*\n`;
-                ujianHariIni.forEach((u, i) => {
-                    message += `> _${i + 1}. ${u.nama_matakuliah || u.matakuliah}_\n`;
-                    message += `   \`Jam :\` ${u.jam_mulai} - ${u.jam_selesai}\n`;
-                    message += `   \`Ruangan :\` ${u.ruangan || 'N/A'}\n`;
-                    message += `   \`Jenis Ujian :\` ${u.jenis_ujian || 'Ujian'}\n`;
-                    if (i < ujianHariIni.length - 1) message += `\n`;
-                });
-            }
+            kuliahHariIni.forEach((j, i) => {
+                const tipe = j.tipe_pertemuan_presensi === 'T' ? 'Teori' : 
+                            j.tipe_pertemuan_presensi === 'P' ? 'Praktikum' : 
+                            j.tipe_pertemuan_presensi === 'Tt' ? 'Tutorial' : 
+                            j.tipe_pertemuan_presensi === 'PIC' ? 'PIC' : 'N/A';
+                
+                message += `> _${i + 1}. ${j.nama_matakuliah}_\n`;
+                message += `   \`Jam :\` ${j.jam_awal} - ${j.jam_akhir}\n`;
+                message += `   \`Kelas :\` ${j.nama_ruang} | ${j.nama_kelas}\n`;
+                message += `   \`Ket :\` ${j.judul || 'N/A'}\n`;
+                message += `   \`Tipe :\` ${tipe}\n`;
+                message += `   \`Dosen :\` ${this.removeGelar(j.nama_dosen_pengampu_koordinator)}\n`;
+                if (i < kuliahHariIni.length - 1) message += `\n`;
+            });
 
             await sock.sendMessage(m.key.remoteJid, {
                 react: { text: '', key: m.key }

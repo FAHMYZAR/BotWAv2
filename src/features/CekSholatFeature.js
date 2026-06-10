@@ -4,14 +4,8 @@ const config = require('../config/config');
 
 class CekSholatFeature extends BaseFeature {
     constructor() {
-        super('ceksholat', 'Cek jadwal sholat kota di Indonesia', false);
-        this.banners = [
-            'https://files.catbox.moe/iu92u8.jpg',
-            'https://files.catbox.moe/v7u6aw.jpg',
-            'https://files.catbox.moe/i5w2ha.webp',
-            'https://files.catbox.moe/ceshuw.jpeg',
-            'https://s6.imgcdn.dev/YPwUOS.jpg'
-        ];
+        super('ceksholat', 'Cek jadwal sholat kota di Indonesia', false, 'info');
+        this.banners = config.sholatBanners;
         this.lastBannerIndex = -1;
     }
 
@@ -46,35 +40,50 @@ class CekSholatFeature extends BaseFeature {
                 react: { text: '🕌', key: m.key }
             });
 
-            kota = kota.toLowerCase();
-            const url = `${config.apis.lolhuman}/sholat/${encodeURIComponent(kota)}?apikey=${config.lolhumanApiKey}`;
+            // Search for city using MyQuran API
+            const searchUrl = `${config.apis.myquran.sholat.search}/${encodeURIComponent(kota.toLowerCase())}`;
+            const searchResponse = await axios.get(searchUrl, { timeout: 10000 });
             
-            const apiResponse = await axios.get(url, { timeout: 5000 });
-            const response = apiResponse.data;
-
-            if (response.status !== 200 || !response.result) {
+            if (!searchResponse.data.status || !searchResponse.data.data.length) {
                 await sock.sendMessage(m.key.remoteJid, {
                     react: { text: '', key: m.key }
                 });
                 await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Kota tidak ditemukan! Pastikan nama kota benar.' 
+                    text: '❌ Kota tidak ditemukan! Pastikan nama kota benar.\n\nContoh: Bantul, Jakarta, Semarang' 
                 });
                 return;
             }
 
-            const data = response.result;
-            const formattedDate = this.formatDate(data.tanggal);
+            const cityData = searchResponse.data.data[0];
+            
+            // Get today's prayer schedule
+            const jadwalUrl = `${config.apis.myquran.sholat.jadwal}/${cityData.id}/today`;
+            const jadwalResponse = await axios.get(jadwalUrl, { timeout: 10000 });
+            
+            if (!jadwalResponse.data.status || !jadwalResponse.data.data.jadwal) {
+                await sock.sendMessage(m.key.remoteJid, {
+                    react: { text: '', key: m.key }
+                });
+                await sock.sendMessage(m.key.remoteJid, { 
+                    text: '❌ Jadwal sholat tidak tersedia untuk hari ini!' 
+                });
+                return;
+            }
 
-            let message = `🕌 *JADWAL SHOLAT ${data.wilayah.toUpperCase()}*\n`;
-            message += `*${formattedDate}*\n\n`;
-            message += `\`Imsak :\` ${data.imsak}\n`;
-            message += `\`Subuh :\` ${data.subuh}\n`;
-            message += `\`Terbit :\` ${data.terbit}\n`;
-            message += `\`Dhuha :\` ${data.dhuha}\n`;
-            message += `\`Dzuhur :\` ${data.dzuhur}\n`;
-            message += `\`Ashar :\` ${data.ashar}\n`;
-            message += `\`Maghrib :\` ${data.maghrib}\n`;
-            message += `\`Isya :\` ${data.isya}`;
+            const data = jadwalResponse.data.data;
+            const today = Object.keys(data.jadwal)[0];
+            const jadwal = data.jadwal[today];
+
+            let message = `🕌 *JADWAL SHOLAT ${data.kabko}*\n`;
+            message += `*${jadwal.tanggal}*\n\n`;
+            message += `\`Imsak :\` ${jadwal.imsak}\n`;
+            message += `\`Subuh :\` ${jadwal.subuh}\n`;
+            message += `\`Terbit :\` ${jadwal.terbit}\n`;
+            message += `\`Dhuha :\` ${jadwal.dhuha}\n`;
+            message += `\`Dzuhur :\` ${jadwal.dzuhur}\n`;
+            message += `\`Ashar :\` ${jadwal.ashar}\n`;
+            message += `\`Maghrib :\` ${jadwal.maghrib}\n`;
+            message += `\`Isya :\` ${jadwal.isya}`;
 
             await sock.sendMessage(m.key.remoteJid, {
                 react: { text: '', key: m.key }
@@ -86,8 +95,8 @@ class CekSholatFeature extends BaseFeature {
                 text: message,
                 contextInfo: {
                     externalAdReply: {
-                        title: `Jadwal Sholat ${data.wilayah}`,
-                        body: formattedDate,
+                        title: `Jadwal Sholat ${data.kabko}`,
+                        body: jadwal.tanggal,
                         thumbnailUrl: banner,
                         mediaType: 1,
                         renderLargerThumbnail: true
@@ -102,8 +111,8 @@ class CekSholatFeature extends BaseFeature {
             });
             
             let errorMsg = '❌ Terjadi kesalahan saat mengecek jadwal sholat!';
-            if (error.message === 'timeout' || error.message === 'parse_error') {
-                errorMsg = '❌ Lokasi tidak ditemukan!\n\nℹ️ Gunakan nama *Kabupaten/Kota.*\n\nContoh:\n> `.ceksholat Bantul` ✅\n> `.ceksholat Kasihan` ❌';
+            if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+                errorMsg = '❌ Koneksi bermasalah, coba lagi nanti!';
             }
             
             await sock.sendMessage(m.key.remoteJid, { text: errorMsg });

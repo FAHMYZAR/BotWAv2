@@ -5,7 +5,7 @@ const sharp = require('sharp');
 
 class QuoteStickerFeature extends BaseFeature {
     constructor() {
-        super('q', 'Ubah quoted message jadi stiker (Gaya Quotly)', false);
+        super('q', 'Ubah quoted message jadi stiker (Gaya Quotly)', false, 'media');
     }
 
     async execute(m, sock, args) {

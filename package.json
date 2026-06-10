@@ -4,9 +4,11 @@
   "description": "user bot adalah sebuah alat bantu untuk me manage whatsapp sendiri",
   "main": "src/index.js",
   "scripts": {
-    "test": "node",
-    "start": "NODE_ENV=production node src/index.js",
-    "dev": "NODE_ENV=development nodemon --watch src --ext js,json --exec node src/index.js"
+    "start": "NODE_ENV=production bun run src/index.js",
+    "dev": "NODE_ENV=development bun --watch src/index.js",
+    "preview": "node link-preview-service.js",
+    "start:all": "./start-preview-service.sh && bun run src/index.js",
+    "dev:all": "./start-preview-service.sh && bun --watch src/index.js"
   },
   "repository": {
     "type": "git",
@@ -15,17 +17,16 @@
   "keywords": [
     "User-BotWA"
   ],
-  "author": "FahmyzzxXJongnesia",
+  "author": "EL-RUWET Team",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/FAHMYZAR/BotWA/issues"
   },
   "homepage": "https://github.com/FAHMYZAR/BotWA#readme",
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
     "@heyputer/puter.js": "^2.1.7",
     "@tobyg74/tiktok-api-dl": "^1.3.7",
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "@whiskeysockets/baileys": "npm:socketon@^1.8.32",
     "axios": "^1.9.0",
     "canvas": "^3.1.0",
     "cheerio": "^1.1.2",
@@ -33,6 +34,7 @@
     "ffmpeg-static": "^5.2.0",
     "form-data": "^4.0.5",
     "instagram-downloader": "^0.0.0",
+    "jimp": "^1.6.0",
     "pino": "^10.1.0",
     "qc-generator-whatsapp": "^2.0.2",
     "qrcode-terminal": "^0.12.0",

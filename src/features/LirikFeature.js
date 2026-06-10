@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class LirikFeature extends BaseFeature {
     constructor() {
-        super('lirik', 'Cari lirik lagu', false);
+        super('lirik', 'Cari lirik lagu', false, 'tools');
     }
 
     async execute(m, sock, args) {

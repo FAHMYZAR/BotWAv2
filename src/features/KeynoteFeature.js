@@ -1,9 +1,9 @@
 const BaseFeature = require('../core/BaseFeature');
-const { loadKeynotes, saveKeynotes } = require('../../keynoteDB');
+const KeynoteSystem = require('../utils/KeynoteSystem');
 
 class KeynoteFeature extends BaseFeature {
     constructor() {
-        super('addkeynote', 'Tambah catatan', false);
+        super('addkeynote', 'Tambah catatan', false, 'info');
         this.useKeyPrefix = true;
     }
 
@@ -103,18 +103,22 @@ class KeynoteFeature extends BaseFeature {
                 .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
                 .trim();
 
-            const store = loadKeynotes();
-            store.notes[noteName] = {
-                content: sanitizedContent,
-                author: m.key.participant || m.key.remoteJid,
-                created: new Date().toISOString()
-            };
-            saveKeynotes(store);
+            const success = await KeynoteSystem.addKeynote(
+                noteName,
+                sanitizedContent,
+                m.key.participant || m.key.remoteJid
+            );
+            
+            if (!success) {
+                await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal menyimpan keynote!' });
+                return;
+            }
 
+            const prefix = await KeynoteSystem.getPrefix();
             await sock.sendMessage(m.key.remoteJid, { 
                 text: `📝 *Catatan "${noteName}" Tersimpan!*\n` +
-                      `🔖 Prefix: ${store.prefix}\n` +
-                      `📌 Contoh akses: ${store.prefix}${noteName}\n` +
+                      `🔖 Prefix: ${prefix}\n` +
+                      `📌 Contoh akses: ${prefix}${noteName}\n` +
                       `📄 Content: ${sanitizedContent}\n` +
                       `📊 Panjang: ${sanitizedContent.length}/100 karakter`
             });
@@ -125,25 +129,20 @@ class KeynoteFeature extends BaseFeature {
 
     async handleKeynote(m, sock) {
         try {
-            const store = loadKeynotes();
             const body = this.getMessageText(m).trim();
-
+            const prefix = await KeynoteSystem.getPrefix();
+            
             let noteName;
 
             if (this.useKeyPrefix) {
-                if (!body.startsWith(store.prefix)) return false;
-                noteName = body.slice(store.prefix.length).split(/\s+/)[0];
+                if (!body.startsWith(prefix)) return false;
+                noteName = body.slice(prefix.length).split(/\s+/)[0];
             } else {
                 noteName = body.split(/\s+/)[0];
             }
 
-            // CRITICAL: Use hasOwnProperty to prevent prototype pollution access
-            if (!Object.prototype.hasOwnProperty.call(store.notes, noteName)) {
-                return false;
-            }
-
-            const note = store.notes[noteName];
-            if (!note || typeof note !== 'object' || !note.content) return false;
+            const note = await KeynoteSystem.getKeynote(noteName);
+            if (!note || !note.content) return false;
 
             await sock.sendMessage(m.key.remoteJid, { 
                 text: `_${note.content}_`
@@ -164,13 +163,16 @@ class KeynoteFeature extends BaseFeature {
                 return;
             }
 
-            const store = loadKeynotes();
-            store.prefix = args[1];
-            saveKeynotes(store);
-            
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `✅ Prefix keynote diubah ke: ${args[1]}` 
-            });
+            const success = await KeynoteSystem.setPrefix(args[1]);
+            if (success) {
+                await sock.sendMessage(m.key.remoteJid, { 
+                    text: `✅ Prefix keynote diubah ke: ${args[1]}` 
+                });
+            } else {
+                await sock.sendMessage(m.key.remoteJid, { 
+                    text: '❌ Gagal mengubah prefix!' 
+                });
+            }
         } catch (error) {
             await this.handleError(m, sock, error);
         }
@@ -197,13 +199,13 @@ class KeynoteFeature extends BaseFeature {
             }
 
             this.useKeyPrefix = value === 1;
-            const store = loadKeynotes();
+            const prefix = await KeynoteSystem.getPrefix();
             
             await sock.sendMessage(m.key.remoteJid, { 
                 text: `✅ *Keynote Prefix Setting Updated!*\n\n` +
                       `Mode: ${this.useKeyPrefix ? 'Menggunakan Prefix' : 'Tanpa Prefix'}\n` +
-                      `Prefix: ${store.prefix}\n` +
-                      `Contoh: ${this.useKeyPrefix ? `${store.prefix}note` : 'note'}`
+                      `Prefix: ${prefix}\n` +
+                      `Contoh: ${this.useKeyPrefix ? `${prefix}note` : 'note'}`
             });
         } catch (error) {
             await this.handleError(m, sock, error);

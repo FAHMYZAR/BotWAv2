@@ -1,122 +1,152 @@
 const BaseFeature = require('../core/BaseFeature');
-const axios = require('axios');
 const config = require('../config/config');
+
+class RouterClient {
+    constructor() {
+        this.baseUrl = String(config.router?.baseUrl || '').replace(/\/$/, '');
+        this.apiKey = config.router?.apiKey;
+        this.chatModel = config.router?.chatModel;
+    }
+
+    get headers() {
+        return {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiKey}`
+        };
+    }
+
+    extractChatText(data) {
+        const choice = data?.choices?.[0];
+        const messageContent = choice?.message?.content;
+        if (typeof messageContent === 'string') return messageContent;
+        if (Array.isArray(messageContent)) {
+            const joined = messageContent.map((item) => typeof item === 'string' ? item : item?.text || item?.content || '').filter(Boolean).join('\n');
+            if (joined) return joined;
+        }
+        if (typeof choice?.text === 'string') return choice.text;
+        if (typeof data?.output_text === 'string') return data.output_text;
+        return '';
+    }
+
+    async chat(messages) {
+        if (!this.baseUrl || !this.apiKey) throw new Error('Router AI belum diset');
+        const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: this.headers,
+            body: JSON.stringify({ model: this.chatModel, stream: false, messages })
+        });
+        if (!response.ok) throw new Error(await response.text() || 'Router chat gagal');
+        return this.extractChatText(await response.json());
+    }
+
+    async search(query, maxResults = 5) {
+        if (!this.baseUrl || !this.apiKey) throw new Error('Router AI belum diset');
+        const response = await fetch(`${this.baseUrl}/v1/search`, {
+            method: 'POST',
+            headers: this.headers,
+            body: JSON.stringify({ model: 'searxng', query, search_type: 'web', max_results: maxResults, language: 'id' })
+        });
+        if (!response.ok) throw new Error(await response.text() || 'Router search gagal');
+        return response.json();
+    }
+}
 
 class CuacaFeature extends BaseFeature {
     constructor() {
-        super('cuaca', 'Cek cuaca kota di Indonesia', false);
+        super('cuaca', 'Cek cuaca lokasi manapun di dunia (realtime)', false, 'info');
     }
 
-    getWeatherBanner(cuaca, description) {
-        const weather = cuaca.toLowerCase();
-        const desc = description.toLowerCase();
-
-        // Hujan
-        if (weather.includes('rain') || desc.includes('rain')) {
-            return 'https://media.suara.com/pictures/653x366/2022/05/11/43846-ilustrasi-hujan-bacaan-doa-turun-hujan-dan-artinyapixabay.jpg';
-        }
-        // Berawan/Mendung
-        if (weather.includes('clouds') || desc.includes('cloud') || desc.includes('overcast')) {
-            return 'https://akcdn.detik.net.id/community/media/visual/2025/01/05/potret-mendung-hitam-menggelanyut-di-langit-jakarta_43.jpeg?w=400&q=90';
-        }
-        // Cerah
-        if (weather.includes('clear') || desc.includes('clear')) {
-            return 'https://images.unsplash.com/photo-1601297183305-6df142704ea2?w=800';
-        }
-        // Gerimis/Drizzle
-        if (weather.includes('drizzle') || desc.includes('drizzle')) {
-            return 'https://media.suara.com/pictures/653x366/2022/05/11/43846-ilustrasi-hujan-bacaan-doa-turun-hujan-dan-artinyapixabay.jpg';
-        }
-        // Badai
-        if (weather.includes('thunderstorm') || desc.includes('thunder')) {
-            return 'https://media.suara.com/pictures/653x366/2022/05/11/43846-ilustrasi-hujan-bacaan-doa-turun-hujan-dan-artinyapixabay.jpg';
-        }
-        // Default
-        return 'https://lh4.googleusercontent.com/proxy/ou4voJsmQDMGoQocyZvWROlwQkgOEU9B-xn0eNt25g7u1xVFMwjoh8NvZ9AAu0v2fA3zPJ91ai6NzLYoTAmyoQmb9Abi_y_xB7OKB886dd9EvoEdNVhVFuT16jrRXZLbuxDeg8RvNt1DfajITZQ2vfriF_ptBdDzDicEluTOAvTYDJzs3w6cnplKZ93DScBJ_a4z-Agh-M7G';
-    }
-
-    translateWeather(description) {
-        const translations = {
-            'clear sky': 'Langit Cerah',
-            'few clouds': 'Sedikit Berawan',
-            'scattered clouds': 'Berawan Tersebar',
-            'broken clouds': 'Berawan',
-            'overcast clouds': 'Mendung',
-            'light rain': 'Hujan Ringan',
-            'moderate rain': 'Hujan Sedang',
-            'heavy rain': 'Hujan Lebat',
-            'drizzle': 'Gerimis',
-            'thunderstorm': 'Badai Petir',
-            'mist': 'Kabut',
-            'fog': 'Kabut Tebal'
-        };
-        return translations[description.toLowerCase()] || description;
+    getCurrentDateTime() {
+        return new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        }).format(new Date());
     }
 
     async execute(m, sock, args) {
         try {
-            const kota = args.join(' ');
+            const lokasi = args.join(' ');
 
-            if (!kota) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Masukkan nama kota!\n\nContoh:\n> `.cuaca Yogyakarta`\n> `.cuaca Jakarta`\n> `.cuaca Blora`' 
-                });
-                return;
-            }
-
-            await sock.sendMessage(m.key.remoteJid, { text: '🌤️ Mengecek cuaca...' });
-
-            const response = await axios.get(`${config.apis.lolhuman}/cuaca/${encodeURIComponent(kota)}`, {
-                params: { apikey: config.lolhumanApiKey },
-                timeout: 10000
-            });
-
-            if (response.data.status !== 200 || !response.data.result) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Kota tidak ditemukan! Pastikan nama kota benar.' 
-                });
-                return;
-            }
-
-            const data = response.data.result;
-            const weatherDesc = this.translateWeather(data.description);
-            const bannerUrl = this.getWeatherBanner(data.cuaca, data.description);
-
-            const mapsUrl = `https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
-
-            let message = `🌤️ *CUACA ${data.tempat.toUpperCase()}*\n\n`;
-            message += `*🌡️ SUHU*\n> \`${data.suhu}\`\n`;
-            message += `*☁️ KONDISI*\n> \`${weatherDesc}\`\n`;
-            message += `*💧 KELEMBAPAN*\n> \`${data.kelembapan}\`\n`;
-            message += `*💨 ANGIN*\n> \`${data.angin}\`\n`;
-            message += `*🌊 TEKANAN UDARA*\n> \`${data.udara}\`\n`;
-            message += `*📍 LOKASI*\n> ${mapsUrl}\n\n`;
-            message += `_🔥 FAHMYZZX-BOT © ${new Date().getFullYear()}_`;
-
-            // Download banner
-            try {
-                const bannerResponse = await axios.get(bannerUrl, { 
-                    responseType: 'arraybuffer', 
-                    timeout: 10000,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                    }
-                });
+            if (!lokasi) {
                 await sock.sendMessage(m.key.remoteJid, {
-                    image: Buffer.from(bannerResponse.data),
-                    caption: message
+                    text: '❌ Masukkan nama lokasi!\n\n*Contoh:*\n> `.cuaca Jakarta`\n> `.cuaca New York`\n> `.cuaca Tokyo`\n> `.cuaca Paris, France`\n\n✨ Bisa cek cuaca di seluruh dunia!'
                 });
-            } catch (err) {
-                console.error('Banner download error:', err.message);
-                // Fallback tanpa banner
-                await sock.sendMessage(m.key.remoteJid, { text: message });
+                return;
             }
+
+            await sock.sendMessage(m.key.remoteJid, { react: { text: '🌤️', key: m.key } });
+
+            const currentDateTime = this.getCurrentDateTime();
+            const systemInstruction = `Kamu adalah asisten cuaca yang memberikan informasi cuaca realtime.
+
+*TUGAS:*
+1. Cari data cuaca TERKINI untuk lokasi yang diminta menggunakan Google Search
+2. Berikan informasi dalam format yang KONSISTEN dan TERSTRUKTUR
+3. Gunakan data REALTIME dari sumber terpercaya (weather.com, accuweather, dll)
+4. Waktu pencarian: ${currentDateTime} WIB (Asia/Jakarta)
+5. WAJIB cari timezone lokasi dan hitung selisih waktu dengan WIB
+
+*FORMAT OUTPUT WAJIB (STRICT):*
+Berikan HANYA dalam format ini, tidak boleh ada teks tambahan:
+
+🌤️ *CUACA [NAMA LOKASI]*
+
+*🌡️ SUHU :* \`[suhu]°C / [suhu]°F\`
+*☁️ KONDISI :* \`[kondisi cuaca dalam bahasa Indonesia]\`
+*💦 KELEMBAPAN :* \`[kelembapan]%\`
+*🌬️ ANGIN :* \`[kecepatan angin] km/jam\`
+*🧭 ARAH ANGIN :* \`[arah angin]\`
+*🔥 MATAHARI :*
+> Terbit: \`[waktu]\` | Terbenam: \`[waktu]\`
+*WAKTU [NAMA LOKASI] :* \`[HH:MM] ([Timezone])
+*SELISIH :* \`[+/-X jam Y menit dari WIB]\`
+
+_Update: ${currentDateTime} WIB_
+
+*ATURAN PENTING:*
+- Gunakan data TERKINI (hari ini, jam ini yaitu ${currentDateTime} di Asia/Jakarta)
+- WAJIB tampilkan JAM LOKAL di lokasi tersebut dalam format 24 jam (HH:MM)
+- WAJIB hitung SELISIH WAKTU dengan WIB dalam format: "+X jam Y menit" atau "-X jam Y menit"
+- Contoh selisih: "+7 jam 0 menit", "-5 jam 30 menit", "+0 jam 30 menit"
+- Jika selisih 0 (sama dengan WIB), JANGAN tampilkan baris JAM LOKAL dan SELISIH WAKTU
+- Jika lokasi tidak ditemukan, katakan "❌ Lokasi tidak ditemukan"
+- Suhu dalam Celsius DAN Fahrenheit
+- Kondisi cuaca dalam Bahasa Indonesia
+- Waktu matahari dalam format 24 jam (HH:MM)
+- JANGAN tambahkan penjelasan atau teks di luar format`;
+
+            const client = new RouterClient();
+            const searchResults = await client.search(`cuaca ${lokasi} ${currentDateTime}`, 5);
+
+            if (!searchResults?.data?.length) {
+                await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+                await sock.sendMessage(m.key.remoteJid, { text: '❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`' });
+                return;
+            }
+
+            const rawAnswer = await client.chat([
+                { role: 'system', content: systemInstruction + '\n\nJawab berdasarkan SEARCH_RESULT di bawah. Jangan mengarang data di luar hasil search.' },
+                { role: 'user', content: `SEARCH_RESULT:\n${JSON.stringify(searchResults.data, null, 2)}\n\nBerikan informasi cuaca TERKINI untuk lokasi: ${lokasi}` }
+            ]);
+
+            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+
+            if (rawAnswer.includes('tidak ditemukan') || rawAnswer.includes('not found')) {
+                await sock.sendMessage(m.key.remoteJid, { text: '❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`' });
+                return;
+            }
+
+            await sock.sendMessage(m.key.remoteJid, { text: rawAnswer });
 
         } catch (error) {
-            console.error('Cuaca error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mengecek cuaca!' 
-            });
+            console.error('Cuaca error:', error.message);
+            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+            await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan saat mengecek cuaca!\n\nCoba lagi dalam beberapa saat.' });
         }
     }
 }

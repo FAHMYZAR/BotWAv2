@@ -1,8 +1,9 @@
 class BaseFeature {
-    constructor(name, description, ownerOnly = false) {
+    constructor(name, description, ownerOnly = false, category = 'tools') {
         this.name = name;
         this.description = description;
         this.ownerOnly = ownerOnly;
+        this.category = category;
     }
 
     async execute(message, chat, args) {

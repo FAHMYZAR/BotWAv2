@@ -5,7 +5,7 @@ const sharp = require('sharp');
 
 class SmemeFeature extends BaseFeature {
     constructor() {
-        super('smeme', 'Buat meme dari gambar/sticker (reply gambar + teks)', false);
+        super('smeme', 'Buat meme dari gambar/sticker (reply gambar + teks)', false, 'media');
     }
 
     async execute(m, sock, args) {

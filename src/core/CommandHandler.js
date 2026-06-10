@@ -58,6 +58,13 @@ class CommandHandler {
             // Execute registered feature
             const feature = featureRegistry.get(command);
             if (feature && !feature.ownerOnly) {
+                // Block admin category features with user prefix
+                if (feature.category === 'admin') {
+                    await sock.sendMessage(m.key.remoteJid, { 
+                        text: `❌ Fitur admin harus menggunakan prefix ${config.ownerPrefix}\n\nContoh: ${config.ownerPrefix}${command}` 
+                    });
+                    return;
+                }
                 await feature.execute(m, sock, args);
             } else {
                 console.log(`[UNKNOWN CMD] User: .${command}`);

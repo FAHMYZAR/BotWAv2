@@ -8,7 +8,7 @@ const config = require('../config/config');
 
 class OcrFeature extends BaseFeature {
     constructor() {
-        super('ocr', 'Extract text dari gambar', false);
+        super('ocr', 'Extract text dari gambar', false, 'tools');
         this.processing = new Set();
         this.maxSize = 10 * 1024 * 1024; // 10MB
     }
@@ -123,7 +123,7 @@ class OcrFeature extends BaseFeature {
             });
 
             await sock.sendMessage(m.key.remoteJid, {
-                text: `📄 *OCR Result*\n\n${extractedText}\n\n_✨ Extracted by FAHMYZZX-BOT_`
+                text: `📄 *OCR Result*\n\n${extractedText}\n\n_✨ Extracted by EL-RUWET [BOT + AI]_`
             });
 
         } catch (error) {

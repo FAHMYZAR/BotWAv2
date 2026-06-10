@@ -2,7 +2,7 @@ const BaseFeature = require('../core/BaseFeature');
 
 class HideTagFeature extends BaseFeature {
     constructor() {
-        super('hidetag', 'Tag semua member tanpa tampilkan username', true);
+        super('hidetag', 'Tag semua member tanpa tampilkan username', false, 'group');
     }
 
     async execute(m, sock, args) {

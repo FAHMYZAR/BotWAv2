@@ -8,7 +8,7 @@ const config = require('../config/config');
 
 class ToUrlFeature extends BaseFeature {
     constructor() {
-        super('tourl', 'Mengubah media menjadi URL', false);
+        super('tourl', 'Mengubah media menjadi URL', false, 'tools');
     }
 
     async execute(m, sock, args) {

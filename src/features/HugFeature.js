@@ -5,7 +5,7 @@ const sharp = require('sharp');
 
 class HugFeature extends BaseFeature {
     constructor() {
-        super('hug', 'Random hug anime sticker', false);
+        super('hug', 'Random hug anime sticker', false, 'fun');
     }
 
     async execute(m, sock, args) {

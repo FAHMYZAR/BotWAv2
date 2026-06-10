@@ -3,7 +3,7 @@ const { bratGenerator } = require('qc-generator-whatsapp');
 
 class BratFeature extends BaseFeature {
     constructor() {
-        super('brat', 'Membuat stiker brat', false);
+        super('brat', 'Membuat stiker brat', false, 'media');
     }
 
     async execute(m, sock, args) {

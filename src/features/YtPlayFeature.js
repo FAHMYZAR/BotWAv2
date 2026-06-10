@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class YtPlayFeature extends BaseFeature {
     constructor() {
-        super('ytplay', 'Search dan play musik YouTube', false);
+        super('ytplay', 'Search dan play musik YouTube', false, 'download');
         this.searchCache = new Map();
         this.pageCache = new Map();
         this.messageCache = new Map();

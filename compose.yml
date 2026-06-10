@@ -1,16 +1,28 @@
 services:
-  botwa:
-    image: fahmyzzx/botwa:latest
-    container_name: fahmyzzx-botwa
+  botwav2:
+    image: fahmyzzx/botwav2:latest
+    container_name: fahmyzzx-botwav2
     restart: unless-stopped
     volumes:
-      - botwa-data:/app/auth_info_baileys
+      - botwav2-data-fresh:/app/auth_info_baileys
+      - botwav2-db-data:/app/data
       - ./baileys_store.json:/app/baileys_store.json
-      - ./keynotes.json:/app/keynotes.json
-      - ./registeredGroups.json:/app/registeredGroups.json
+    env_file:
+      - .env
     environment:
       - TZ=Asia/Jakarta
       - NODE_ENV=production
+    network_mode: "host"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
-  botwa-data:
+  botwav2-data-fresh:
+  botwav2-db-data:
+
+networks:
+  himatik_default:
+    external: true

@@ -4,19 +4,19 @@ const path = require('path');
 
 class StartFeature extends BaseFeature {
     constructor() {
-        super('start', 'Pesan selamat datang', false);
+        super('start', 'Pesan selamat datang', false, 'info');
     }
 
     async execute(m, sock, args) {
         try {
-            const imagePath = path.join(__dirname, '../../disk/welcome.jpg');
+            const imagePath = path.join(__dirname, '../../disk/welcome.png');
             const imageBuffer = fs.readFileSync(imagePath);
             
             const caption = 
                 `👋 *SELAMAT DATANG!*\n\n` +
                 `*📋 INFO*\n` +
                 `> Gunakan \`.help\` untuk melihat daftar perintah\n\n` +
-                `_🔥 FAHMYZZX-BOT © ${new Date().getFullYear()}_`;
+                `_🔥 EL-RUWET [BOT + AI] © ${new Date().getFullYear()}_`;
 
             await sock.sendMessage(m.key.remoteJid, {
                 image: imageBuffer,

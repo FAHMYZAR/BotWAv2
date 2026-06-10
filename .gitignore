@@ -4,15 +4,23 @@
 # Ignore wawebjs_cache folder
 .wwebjs_cache/
 
-# Ignore baileys auth folders
+# Ignore baileys auth folders & session stores
 auth_info_baileys/
 auth_info_baileys_dev/
+baileys_store.json
+
+# SQLite Database
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # Ignore node_modules folder
 node_modules/
 
 # Ignore log files
 *.log
+logs/
 
 # Ignore system files
 .DS_Store
@@ -20,3 +28,13 @@ Thumbs.db
 
 # Ignore environment files
 .env
+.env.*
+!.env.example
+
+# Temp and downloads
+temp/
+downloads/
+
+# Build artifacts
+dist/
+build/

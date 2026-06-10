@@ -5,7 +5,7 @@ const { createCanvas, loadImage } = require('canvas');
 
 class TrigerFeature extends BaseFeature {
     constructor() {
-        super('triger', 'Buat efek "triggered" deep-fried', false);
+        super('triger', 'Buat efek "triggered" deep-fried', false, 'fun');
     }
 
     async execute(m, sock, args) {

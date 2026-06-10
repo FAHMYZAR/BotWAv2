@@ -1,13 +1,20 @@
-const axios = require('axios');
-
 class GreetingsHandler {
     constructor(sock) {
         this.sock = sock;
         this.welcomeBanner = 'https://files.catbox.moe/fghoxj.webp';
         this.goodbyeBanner = 'https://files.catbox.moe/5cl9sb.jpg';
+        this.processing = new Set();
     }
 
     async handleJoin(groupJid, participants) {
+        const key = `join_${groupJid}`;
+        if (this.processing.has(key)) {
+            console.log('[GREETINGS] Already processing join for', groupJid);
+            return;
+        }
+        
+        this.processing.add(key);
+        
         try {
             const groupMetadata = await this.sock.groupMetadata(groupJid);
             const mentions = participants.map(p => p.phoneNumber || p.id || p);
@@ -18,22 +25,35 @@ class GreetingsHandler {
             message += `Selamat bergabung di *${groupMetadata.subject}*\n\n`;
             message += `Semoga betah dan jangan lupa baca deskripsi grup ya!`;
 
-            const bannerResponse = await axios.get(this.welcomeBanner, { 
-                responseType: 'arraybuffer',
-                timeout: 5000
-            });
-
             await this.sock.sendMessage(groupJid, {
-                image: Buffer.from(bannerResponse.data),
-                caption: message,
-                mentions: mentions
+                text: message,
+                mentions: mentions,
+                contextInfo: {
+                    externalAdReply: {
+                        title: 'Selamat Datang!',
+                        body: groupMetadata.subject,
+                        thumbnailUrl: this.welcomeBanner,
+                        mediaType: 1,
+                        renderLargerThumbnail: true
+                    }
+                }
             });
         } catch (error) {
-            console.error('Greetings Join error:', error.message);
+            console.error('[GREETINGS] Join error:', error.message);
+        } finally {
+            this.processing.delete(key);
         }
     }
 
     async handleLeave(groupJid, participants) {
+        const key = `leave_${groupJid}`;
+        if (this.processing.has(key)) {
+            console.log('[GREETINGS] Already processing leave for', groupJid);
+            return;
+        }
+        
+        this.processing.add(key);
+        
         try {
             const groupMetadata = await this.sock.groupMetadata(groupJid);
             const mentions = participants.map(p => p.phoneNumber || p.id || p);
@@ -44,18 +64,23 @@ class GreetingsHandler {
             message += `Semoga sukses selalu di luar sana!\n`;
             message += `Terima kasih sudah menjadi bagian dari *${groupMetadata.subject}*`;
 
-            const bannerResponse = await axios.get(this.goodbyeBanner, { 
-                responseType: 'arraybuffer',
-                timeout: 5000
-            });
-
             await this.sock.sendMessage(groupJid, {
-                image: Buffer.from(bannerResponse.data),
-                caption: message,
-                mentions: mentions
+                text: message,
+                mentions: mentions,
+                contextInfo: {
+                    externalAdReply: {
+                        title: 'Sayonara!',
+                        body: groupMetadata.subject,
+                        thumbnailUrl: this.goodbyeBanner,
+                        mediaType: 1,
+                        renderLargerThumbnail: true
+                    }
+                }
             });
         } catch (error) {
-            console.error('Greetings Leave error:', error.message);
+            console.error('[GREETINGS] Leave error:', error.message);
+        } finally {
+            this.processing.delete(key);
         }
     }
 }

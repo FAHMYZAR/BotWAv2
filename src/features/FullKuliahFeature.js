@@ -3,7 +3,7 @@ const fetchJadwalKuliah = require('../utils/KuliahHelper');
 
 class FullKuliahFeature extends BaseFeature {
     constructor() {
-        super('fullkuliah', 'Lihat semua jadwal kuliah & ujian minggu ini', false);
+        super('fullkuliah', 'Lihat semua jadwal kuliah & ujian minggu ini', false, 'akademik');
     }
 
     removeGelar(nama) {
@@ -27,7 +27,12 @@ class FullKuliahFeature extends BaseFeature {
         try {
             await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
 
-            const data = await fetchJadwalKuliah();
+            let type = 'rpl'; // default to RPL
+            if (args.length > 0 && ['rpl', 'ds'].includes(args[0].toLowerCase())) {
+                type = args[0].toLowerCase();
+            }
+
+            const data = await fetchJadwalKuliah(type);
 
             if (data.kuliah?.isHtml || data.ujian?.isHtml) {
                 await sock.sendMessage(m.key.remoteJid, {
@@ -60,7 +65,8 @@ class FullKuliahFeature extends BaseFeature {
             // Process Ujian
             const ujianList = Array.isArray(data.ujian) ? data.ujian : (data.ujian.data || []);
 
-            let message = `📅 *JADWAL MINGGU INI*\n\n`;
+            const displayType = type === 'ds' ? 'DATA-SCIENCE' : type.toUpperCase();
+            let message = `📅 *JADWAL ${displayType} MINGGU INI*\n\n`;
 
             // Display by day
             Object.keys(kuliahByDay).sort().forEach(day => {

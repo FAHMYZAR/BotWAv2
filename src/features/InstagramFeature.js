@@ -7,7 +7,7 @@ const path = require('path');
 
 class InstagramFeature extends BaseFeature {
     constructor() {
-        super('ig', 'Download video/foto Instagram (reel/post)', false);
+        super('ig', 'Download video/foto Instagram (reel/post)', false, 'download');
     }
 
     async execute(m, sock, args) {

@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class AttpFeature extends BaseFeature {
     constructor() {
-        super('attp', 'Buat sticker animasi dari text', false);
+        super('attp', 'Buat sticker animasi dari text', false, 'media');
     }
 
     async execute(m, sock, args) {

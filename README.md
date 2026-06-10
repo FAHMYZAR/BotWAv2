@@ -1,4 +1,4 @@
-# 🔄 Refactoring Guide - FAHMYZZX-BotWa
+# 🔄 Refactoring Guide - EL-RUWET [BOT + AI]
 
 ## 📋 Perubahan Utama
 
@@ -29,7 +29,7 @@ BotWA/
 │   │   └── SystemHelper.js        # Helper untuk info sistem
 │   └── index.js                   # Entry point baru
 ├── disk/
-│   └── welcome.jpg
+│   └── welcome.png
 ├── keynoteDB.js                   # Database keynote (tetap)
 ├── keynotes.json
 ├── index.js                       # ⚠️ File lama (backup)
@@ -134,8 +134,8 @@ class Config {
     constructor() {
         this.ownerPrefix = '!';
         this.userPrefix = '.';
-        this.ownerNumber = '6285226166485';
-        this.ownerNumberFormatted = '6285226166485@c.us';
+        this.ownerNumber = '6285878556744';
+        this.ownerNumberFormatted = '6285878556744@c.us';
     }
 }
 ```
@@ -209,8 +209,8 @@ npm run old
 ## 📞 Support
 
 Jika ada masalah atau pertanyaan:
-- GitHub Issues: https://github.com/FAHMYZAR/FAHMYZZX-BotWa/issues
-- Developer: FahmyzzxXJongnesia
+- GitHub Issues: https://github.com/FAHMYZAR/EL-RUWET-BotWa/issues
+- Developer: EL-RUWET Team
 
 ---
 

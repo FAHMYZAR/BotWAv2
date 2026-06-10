@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 class TranslateFeature extends BaseFeature {
     constructor() {
-        super('tr', 'Translate text ke bahasa lain', false);
+        super('tr', 'Translate text ke bahasa lain', false, 'tools');
     }
 
     getFlag(langCode) {

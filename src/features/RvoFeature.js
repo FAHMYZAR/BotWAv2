@@ -5,7 +5,7 @@ const path = require('path');
 
 class RvoFeature extends BaseFeature {
     constructor() {
-        super('rvo', 'Ekstrak media view once', false);
+        super('rvo', 'Ekstrak media view once', false, 'owner');
     }
 
     async execute(m, sock, args) {

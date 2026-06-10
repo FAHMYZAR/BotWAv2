@@ -1,21 +1,17 @@
 const BaseFeature = require('../core/BaseFeature');
-const { loadKeynotes } = require('../../keynoteDB');
+const KeynoteSystem = require('../utils/KeynoteSystem');
 
 class ListNoteFeature extends BaseFeature {
     constructor() {
-        super('listnote', 'Lihat daftar semua catatan', false);
+        super('listnote', 'Lihat daftar semua catatan', false, 'info');
     }
 
     async execute(m, sock, args) {
         try {
-            const store = loadKeynotes();
+            const notes = await KeynoteSystem.getAllKeynotes();
+            const prefix = await KeynoteSystem.getPrefix();
             
-            // Get all note names using Object.keys (safe from prototype pollution)
-            const noteNames = Object.keys(store.notes).filter(key => 
-                Object.prototype.hasOwnProperty.call(store.notes, key)
-            );
-
-            if (noteNames.length === 0) {
+            if (notes.length === 0) {
                 await sock.sendMessage(m.key.remoteJid, { 
                     text: '📝 *DAFTAR CATATAN*\n\n❌ Belum ada catatan tersimpan\n\n💡 Tambah catatan: !addkeynote [nama] [isi]'
                 });
@@ -23,14 +19,14 @@ class ListNoteFeature extends BaseFeature {
             }
 
             let message = `📝 *DAFTAR CATATAN*\n\n`;
-            message += `🔖 Prefix: ${store.prefix}\n`;
-            message += `📊 Total: ${noteNames.length} catatan\n\n`;
+            message += `🔖 Prefix: ${prefix}\n`;
+            message += `📊 Total: ${notes.length} catatan\n\n`;
 
-            noteNames.forEach((name, index) => {
-                message += `${index + 1}. ${store.prefix}${name}\n`;
+            notes.forEach((note, index) => {
+                message += `${index + 1}. ${prefix}${note.key}\n`;
             });
 
-            message += `\n💡 Akses: Ketik ${store.prefix}[nama]`;
+            message += `\n💡 Akses: Ketik ${prefix}[nama]`;
 
             await sock.sendMessage(m.key.remoteJid, { text: message });
 
