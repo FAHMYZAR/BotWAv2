@@ -24,14 +24,9 @@ class Config {
             baseUrl: 'https://raising.almaata.ac.id'
         };
 
-        const isProduction = (process.env.NODE_ENV || '').toLowerCase() === 'production';
-        const defaultRouterBaseUrl = isProduction ? 'http://localhost:20128' : 'https://9router.icbear.space';
-
         this.router = {
             apiKey: process.env.ROUTER_API_KEY || '',
-            baseUrl: isProduction
-                ? (process.env.ROUTER_PRODUCTION_BASE_URL || defaultRouterBaseUrl)
-                : (process.env.ROUTER_BASE_URL || defaultRouterBaseUrl),
+            baseUrl: process.env.ROUTER_PRODUCTION_BASE_URL || 'http://localhost:20128',
             chatModel: process.env.ROUTER_CHAT_MODEL || 'vpscombo',
             queryModel: process.env.ROUTER_QUERY_MODEL || 'fastcombo'
         };
@@ -45,7 +40,7 @@ class Config {
 
         this.googleAi = {
             apiKey: process.env.GOOGLE_AI_API_KEY || '',
-            baseUrl: process.env.GOOGLE_AI_BASE_URL || 'https://googleai.minurulfalahsindangkarsa.com'
+            baseUrl: process.env.GOOGLE_AI_BASE_URL || 'http://localhost:9876'
         };
         
         this.apis = {
