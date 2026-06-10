@@ -47,8 +47,6 @@ class CekPresensiFeature extends BaseFeature {
             message += `Nama: ${result.nama}\n`;
             message += `NIM: ${result.nim}\n\n`;
             message += `Sudah: ${result.sudah} | Belum: ${result.belum}\n\n`;
-            message += `━━━━━━━━━━━━━━━━━\n\n`;
-
             result.list.forEach((item, i) => {
                 const statusStr = item.status === 'sudah' ? '✅ Sudah' : '❌ Belum';
                 message += `> _${i + 1}. ${item.matakuliah} (${item.kelas})_\n`;
