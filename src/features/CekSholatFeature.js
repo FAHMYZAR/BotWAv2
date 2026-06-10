@@ -167,8 +167,7 @@ class CekSholatFeature extends BaseFeature {
             const banner = this.getRandomBanner();
             const senderId = m.key.participant || m.key.remoteJid;
 
-            let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n`;
-            message += `Source: ${sourceUrl}\n\n`;
+            let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n\n`;
             message += `*Jadwal*\n`;
             message += `› Tanggal: ${jadwal.tanggal}\n`;
             message += `› Subuh: ${jadwal.subuh}\n`;
@@ -179,7 +178,7 @@ class CekSholatFeature extends BaseFeature {
             message += `› Isya: ${jadwal.isya}`;
 
             if (activePrayer?.time) {
-                message += `\n\n> Menuju ${activePrayer.name} ${countdown}`;
+                message += `\n_Menuju ${activePrayer.name} ${countdown}_`;
             }
 
             console.log('[CEKSHOLAT] Sending interactive message...');
