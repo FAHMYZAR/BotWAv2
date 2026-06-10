@@ -277,6 +277,88 @@ async function doPresensi(nim, kodePresensi) {
     }
 }
 
+/**
+ * Ambil semua jadwal kuliah hari ini dengan status presensinya
+ */
+async function getJadwalPresensiHariIni(session, token, nim) {
+    try {
+        const url = `${BASE_URL}/${token}/api/perkuliahan/get_jadwal_kuliah_mahasiswa/${nim}`;
+        const response = await session.get(url, {
+            headers: {
+                'Accept': 'application/json, text/plain, */*',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (response.data && response.data.status === 'success') {
+            const today = new Date().getDay();
+            const listHariIni = response.data.data.filter(item => item.day_of_week_number == today);
+            
+            // Deduplicate
+            const uniqueList = listHariIni.filter((j, index, self) => 
+                index === self.findIndex(k => 
+                    k.nama_matakuliah === j.nama_matakuliah &&
+                    k.jam_awal === j.jam_awal &&
+                    k.nama_kelas === j.nama_kelas
+                )
+            );
+
+            let sudahCount = 0;
+            let belumCount = 0;
+            const detailList = uniqueList.map(item => {
+                const sudahAbsen = !!item.id_absensi_mahasiswa || item.status_presensi == '1';
+                if (sudahAbsen) sudahCount++;
+                else belumCount++;
+
+                return {
+                    matakuliah: item.nama_matakuliah || 'N/A',
+                    kelas: item.nama_kelas || '',
+                    jam: `${item.jam_awal || 'N/A'} - ${item.jam_akhir || 'N/A'}`,
+                    status: sudahAbsen ? 'sudah' : 'belum',
+                    ruang: item.nama_ruang || 'N/A'
+                };
+            });
+
+            return {
+                total: uniqueList.length,
+                sudah: sudahCount,
+                belum: belumCount,
+                list: detailList
+            };
+        }
+        throw new Error('Gagal memproses respons server');
+    } catch (error) {
+        console.error('[GET JADWAL PRESENSI ERROR]:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * Cek presensi untuk user (dengan auto-detect password)
+ */
+async function cekPresensi(nim, customPassword = null) {
+    let dataLogin;
+    
+    // Gunakan customPassword jika diberikan, jika tidak lakukan auto-detect
+    if (customPassword) {
+        dataLogin = await login(nim, customPassword);
+    } else {
+        try {
+            dataLogin = await login(nim, `Pass${nim}`);
+        } catch (error) {
+            dataLogin = await login(nim, nim);
+        }
+    }
+
+    const idMahasiswa = await getIdMahasiswa(dataLogin.session, dataLogin.token);
+    if (!idMahasiswa) {
+        throw new Error('ID mahasiswa tidak ditemukan');
+    }
+    
+    return await getJadwalPresensiHariIni(dataLogin.session, dataLogin.token, nim);
+}
+
 module.exports = {
-    doPresensi
+    doPresensi,
+    cekPresensi
 };
