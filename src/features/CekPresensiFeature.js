@@ -37,19 +37,29 @@ class CekPresensiFeature extends BaseFeature {
             const todayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const todayName = todayNames[new Date().getDay()];
             
-            let message = `📋 *Ringkasan Presensi - ${todayName.toUpperCase()}*\n\n`;
-            message += `✅ Sudah: ${result.sudah}\n`;
-            message += `❌ Belum: ${result.belum}\n`;
-            message += `📚 Total: ${result.total}\n\n`;
+            const formatDate = (date) => {
+                const pad = (n) => n.toString().padStart(2, '0');
+                const d = new Date(date);
+                return `${pad(d.getDate())}-${pad(d.getMonth()+1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())} WIB`;
+            };
+
+            let message = `📋 *RINGKASAN PRESENSI - ${todayName.toUpperCase()}*\n`;
+            message += `Nama: ${result.nama}\n`;
+            message += `NIM: ${result.nim}\n\n`;
+            message += `Sudah: ${result.sudah} | Belum: ${result.belum}\n\n`;
             message += `━━━━━━━━━━━━━━━━━\n\n`;
 
             result.list.forEach((item, i) => {
-                const icon = item.status === 'sudah' ? '✅' : '❌';
-                message += `${icon} *${item.matakuliah} (${item.kelas})*\n`;
-                message += `   🕐 ${item.jam}\n`;
-                message += `   📍 ${item.ruang}\n`;
+                const statusStr = item.status === 'sudah' ? '✅ Sudah' : '❌ Belum';
+                message += `> _${i + 1}. ${item.matakuliah} (${item.kelas})_\n`;
+                message += `   \`Jam :\` ${item.jam}\n`;
+                message += `   \`Ruangan :\` ${item.ruang}\n`;
+                message += `   \`Status :\` ${statusStr}\n`;
                 if (i < result.list.length - 1) message += '\n';
             });
+
+            message += `\n_Update: ${formatDate(result.updatedAt)}_\n`;
+            message += `_EL-RUWET TEAM_`;
 
             await sock.sendMessage(m.key.remoteJid, { text: message });
 

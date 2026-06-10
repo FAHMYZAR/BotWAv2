@@ -124,13 +124,27 @@ async function getIdMahasiswa(session, token) {
             maxRedirects: 5
         });
         
-        // Simple regex search like curl | grep
         const htmlContent = dashboardResp.data;
-        const match = htmlContent.match(/var\s+idmahasiswa\s*=\s*(\d+);?/i);
+        const matchId = htmlContent.match(/var\s+idmahasiswa\s*=\s*(\d+);?/i);
         
-        if (match && match[1]) {
-
-            return match[1];
+        // Coba ambil nama mahasiswa dari tag HTML profil (misal <h3>, <h4>, atau user-name)
+        const $ = cheerio.load(htmlContent);
+        let nama = '';
+        const nameCandidates = [
+            $('.user-name').text(),
+            $('h4.text-white').first().text(),
+            $('.profile-user-name').text(),
+            $('h3').first().text()
+        ];
+        for (const cand of nameCandidates) {
+            if (cand && cand.trim().length > 3) {
+                nama = cand.trim();
+                break;
+            }
+        }
+        
+        if (matchId && matchId[1]) {
+            return { id: matchId[1], nama: nama || 'Mahasiswa' };
         }
         
         console.log('[DEBUG] ID mahasiswa not found');
@@ -245,11 +259,11 @@ async function doPresensi(nim, kodePresensi) {
         }
 
         // Get ID Mahasiswa
-        const idMahasiswa = await getIdMahasiswa(dataLogin.session, dataLogin.token);
-        if (!idMahasiswa) {
+        const mahasiswaInfo = await getIdMahasiswa(dataLogin.session, dataLogin.token);
+        if (!mahasiswaInfo?.id) {
             throw new Error('ID mahasiswa tidak ditemukan');
         }
-        dataLogin.idMahasiswa = idMahasiswa;
+        dataLogin.idMahasiswa = mahasiswaInfo.id;
 
         // Get presensi yang belum dari jadwal mingguan
         const presensiBelum = await getPresensiTersedia(dataLogin.session, dataLogin.token, nim);
@@ -350,12 +364,18 @@ async function cekPresensi(nim, customPassword = null) {
         }
     }
 
-    const idMahasiswa = await getIdMahasiswa(dataLogin.session, dataLogin.token);
-    if (!idMahasiswa) {
+    const mahasiswaInfo = await getIdMahasiswa(dataLogin.session, dataLogin.token);
+    if (!mahasiswaInfo?.id) {
         throw new Error('ID mahasiswa tidak ditemukan');
     }
-    
-    return await getJadwalPresensiHariIni(dataLogin.session, dataLogin.token, nim);
+
+    const result = await getJadwalPresensiHariIni(dataLogin.session, dataLogin.token, nim);
+    return {
+        ...result,
+        nim,
+        nama: mahasiswaInfo.nama,
+        updatedAt: new Date()
+    };
 }
 
 module.exports = {
