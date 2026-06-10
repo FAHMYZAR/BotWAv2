@@ -2,10 +2,24 @@ const BaseFeature = require('../core/BaseFeature');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+const config = require('../config/config');
+
 class CekSholatFeature extends BaseFeature {
     constructor() {
         super('ceksholat', 'Cek jadwal sholat kota di Indonesia', false, 'info');
         this.baseUrl = 'https://jadwal-sholat.kompas.com';
+        this.banners = config.sholatBanners;
+        this.lastBannerIndex = -1;
+    }
+
+    getRandomBanner() {
+        let index;
+        do {
+            index = Math.floor(Math.random() * this.banners.length);
+        } while (index === this.lastBannerIndex && this.banners.length > 1);
+        
+        this.lastBannerIndex = index;
+        return this.banners[index];
     }
 
     slugify(text) {
@@ -150,9 +164,12 @@ class CekSholatFeature extends BaseFeature {
 
             const sourceUrl = `${this.baseUrl}/${this.slugify(label)}`;
             const countdown = activePrayer?.time ? this.getCountdown(activePrayer.time) : '';
+            const banner = this.getRandomBanner();
+            const senderId = m.key.participant || m.key.remoteJid;
 
-            let message = `*Jadwal Sholat untuk ${String(label).toUpperCase()}*\n\n`;
-            message += `Source: ${sourceUrl}\n`;
+            let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n`;
+            message += `Source: ${sourceUrl}\n\n`;
+            message += `*Jadwal*\n`;
             message += `› Tanggal: ${jadwal.tanggal}\n`;
             message += `› Subuh: ${jadwal.subuh}\n`;
             message += `› Terbit: ${jadwal.terbit}\n`;
@@ -165,9 +182,32 @@ class CekSholatFeature extends BaseFeature {
                 message += `\n\n> Menuju ${activePrayer.name} ${countdown}`;
             }
 
-            console.log('[CEKSHOLAT] Sending message...');
+            console.log('[CEKSHOLAT] Sending interactive message...');
             await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
-            await sock.sendMessage(m.key.remoteJid, { text: message });
+
+            try {
+                await sock.sendMessage(m.key.remoteJid, {
+                    interactiveMessage: {
+                        title: `${message}\n`,
+                        footer: '© EL-RUWET TEAM',
+                        thumbnail: banner,
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: 'cta_url',
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: 'Source',
+                                        url: sourceUrl
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                });
+            } catch (err) {
+                console.log('[CEKSHOLAT] Interactive failed, sending text fallback:', err.message);
+                await sock.sendMessage(m.key.remoteJid, { text: message });
+            }
             console.log('[CEKSHOLAT] Message sent');
         } catch (error) {
             console.error('CekSholat error:', error.message, error.stack);
