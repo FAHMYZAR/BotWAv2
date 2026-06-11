@@ -166,36 +166,28 @@ class SholatScheduler {
 
             const footerText = `Sumber: Kompas\nUpdate: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
 
-            if (groupData.lat && groupData.lng) {
-                await this.sock.sendMessage(jid, {
-                    location: {
-                        degreesLatitude: Number(groupData.lat),
-                        degreesLongitude: Number(groupData.lng),
-                        name: kota.toUpperCase(),
-                        address: kota.toUpperCase(),
-                        url: groupData.mapsUrl || undefined
-                    },
-                    caption: `${msg}\n\n${footerText}`
-                });
-            } else {
-                await this.sock.sendMessage(jid, {
-                    interactiveMessage: {
-                        title: `${msg}\n`,
-                        footer: footerText,
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: 'cta_url',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: 'Source Jadwal',
-                                        url: sourceUrl
-                                    })
-                                }
-                            ]
-                        }
+            const thumbnail = groupData.lat && groupData.lng
+                ? `https://maps.googleapis.com/maps/api/staticmap?center=${Number(groupData.lat)},${Number(groupData.lng)}&zoom=15&size=640x360&markers=color:red%7C${Number(groupData.lat)},${Number(groupData.lng)}`
+                : undefined;
+
+            await this.sock.sendMessage(jid, {
+                interactiveMessage: {
+                    title: `${msg}\n`,
+                    footer: footerText,
+                    thumbnail,
+                    nativeFlowMessage: {
+                        buttons: [
+                            {
+                                name: 'cta_url',
+                                buttonParamsJson: JSON.stringify({
+                                    display_text: 'Source Jadwal',
+                                    url: sourceUrl
+                                })
+                            }
+                        ]
                     }
-                });
-            }
+                }
+            });
             if (nama === 'Imsak') this.imsakMessageCache.set(jid, null);
             console.log(`[SCHEDULER] Sent ${nama} to ${jid}`);
         } catch (e) {
