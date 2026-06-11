@@ -40,12 +40,18 @@ function buildSystemInstruction() {
 - Wajib pakai hasil search untuk berita terkini, kondisi saat ini, data real-time, atau pertanyaan yang faktanya bisa berubah.
 
 *FORMAT WHATSAPP:*
-- Tebal pakai *1 bintang*.
-- Miring pakai _underscore_.
-- Code pakai \`code\`.
-- Quote pakai > di awal baris.
-- Jangan pakai LaTeX/MathJax.
-- Matematika pakai plain text dan unicode: x², 1/2, ×, ÷, √, π.
+Gunakan hanya format berikut:
+- Miring: _teks_
+- Tebal: *teks*
+- Coret: ~teks~
+- Monospace: \`\`\`teks\`\`\`
+- Daftar berpoin: * teks ATAU - teks
+- Daftar bernomor: 1. teks
+- Tanda kutip (quote): > teks
+- Kode berderet: \`teks\`
+
+Jangan menggunakan heading Markdown (# atau ##) atau tebal Markdown (**teks**).
+Gunakan plain text untuk matematika: x², 1/2, ×, ÷, √, π.
 
 Waktu sekarang: ${getCurrentJakartaDateTime()} WIB`;
 }
@@ -527,7 +533,10 @@ class ELFeature extends BaseFeature {
 
         if (intent?.needs_search) {
             await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Coba Google AI search...');
-            rawAnswer = await getGoogleAiSearchData(intent.refined_prompt || finalPrompt);
+            rawAnswer = await getGoogleAiSearchData(
+                intent.refined_prompt || finalPrompt,
+                buildSystemInstruction() + '\n\nJika memakai hasil pencarian, jawab final dengan format yang rapi untuk WhatsApp. Gunakan *tebal*, _miring_, bullet yang singkat, dan paragraf pendek. Jangan pakai markdown `**` atau heading markdown. Langsung beri jawaban final, bukan catatan proses pencarian.'
+            );
 
             if (!rawAnswer) {
                 await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Google AI gagal, fallback search...');
