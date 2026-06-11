@@ -164,23 +164,26 @@ class SholatScheduler {
             const slug = kota.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
             const sourceUrl = `https://jadwal-sholat.kompas.com/${slug}`;
 
-            if (groupData.lat && groupData.lng) {
-                try {
-                    await this.sock.sendMessage(jid, {
-                        location: {
-                            degreesLatitude: Number(groupData.lat),
-                            degreesLongitude: Number(groupData.lng),
-                            name: `🕌 ${nama.toUpperCase()} • ${kota.toUpperCase()}`,
-                            address: `${waktu} WIB • Sumber: Kompas • ${sourceUrl}`
-                        }
-                    });
-                } catch (err) {
-                    console.error('[SCHEDULER] Gagal mengirim location message:', err.message);
-                    await this.sock.sendMessage(jid, { text: msg });
+            const footerText = `Sumber: Kompas\nUpdate: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
+
+            await this.sock.sendMessage(jid, {
+                interactiveMessage: {
+                    title: `${msg}\n`,
+                    footer: footerText,
+                    thumbnail: this.getRandomBanner(),
+                    nativeFlowMessage: {
+                        buttons: [
+                            {
+                                name: 'cta_url',
+                                buttonParamsJson: JSON.stringify({
+                                    display_text: 'Source Jadwal',
+                                    url: sourceUrl
+                                })
+                            }
+                        ]
+                    }
                 }
-            } else {
-                await this.sock.sendMessage(jid, { text: msg });
-            }
+            });
             if (nama === 'Imsak') this.imsakMessageCache.set(jid, null);
             console.log(`[SCHEDULER] Sent ${nama} to ${jid}`);
         } catch (e) {
