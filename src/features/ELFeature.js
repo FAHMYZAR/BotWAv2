@@ -419,7 +419,7 @@ class ELFeature extends BaseFeature {
             let hostname = sourceUrl;
             try { hostname = new URL(sourceUrl).hostname; } catch {}
             
-            const footerText = `Sumber: ${hostname}\n\nUpdate: ${timestamp}`;
+            const footerText = `Sumber: ${hostname}\nUpdate: ${timestamp}`;
 
             // Hapus pesan status karena kita akan kirim interactive (gabisa di-edit)
             if (statusMessage?.key) {

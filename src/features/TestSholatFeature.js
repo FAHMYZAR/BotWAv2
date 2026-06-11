@@ -53,10 +53,14 @@ class TestSholatFeature extends BaseFeature {
             
             setTimeout(async () => {
                 if (global.sholatScheduler) {
-                    // Pakai sendGroupReminder dari scheduler yang sudah jalan
-                    // Kirimkan object format `groupId` untuk menyesuaikan dengan parameter SholatScheduler
                     await global.sholatScheduler.sendGroupReminder(
-                        { groupId: groupData.group_id, kota: groupData.kota }, 
+                        { 
+                            groupId: groupData.group_id, 
+                            kota: groupData.kota,
+                            lat: groupData.latitude,
+                            lng: groupData.longitude,
+                            mapsUrl: groupData.maps_url
+                        }, 
                         targetName, 
                         targetTime, 
                         kota, 

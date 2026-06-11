@@ -134,7 +134,7 @@ class SholatScheduler {
             const jid = groupData.group_id || groupData.groupId;
             if (await GroupSystem.isNotifiedToday(jid, nama)) continue;
             // Rekonstruksi object supaya konsisten untuk sendGroupReminder
-            await this.sendGroupReminder({ groupId: jid, kota: groupData.kota }, nama, waktu, kota, subuhTime);
+            await this.sendGroupReminder({ groupId: jid, kota: groupData.kota, lat: groupData.latitude, lng: groupData.longitude, mapsUrl: groupData.maps_url }, nama, waktu, kota, subuhTime);
             await GroupSystem.updateLastNotified(jid, nama);
         }
         for (const userData of allUsers.filter(u => u.kota === kota)) {
@@ -155,7 +155,6 @@ class SholatScheduler {
                 try { await this.sock.sendMessage(jid, { delete: key }); } catch { }
                 this.imsakMessageCache.delete(jid);
             }
-            const bannerUrl = this.getRandomBanner();
             const isFriday = new Date().getDay() === 5;
             let msg = `*Hai Teman-Teman 👋*\n*Sekedar Mengingatkan Waktu Sholat ${nama.toUpperCase()}*\n\n\`Jam :\` *${waktu}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Semoga Allah memberikan kemudahan dalam ibadah kita_ 🤲`;
             if (nama === 'Imsak') msg = `*Hai Teman-Teman 👋*\n*Sekedar Mengingatkan Waktu Imsak*\n*Sebentar Lagi Subuh, Ayo Siap-Siap! 🕌*\n\n\`Imsak :\` *${waktu}*\n\`Subuh :\` *${subuhTime}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Semoga Allah memberikan kemudahan dalam ibadah kita_ 🤲`;
@@ -165,11 +164,26 @@ class SholatScheduler {
             const slug = kota.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
             const sourceUrl = `https://jadwal-sholat.kompas.com/${slug}`;
 
+            // Kirim Location Message jika koordinat tersedia
+            if (groupData.lat && groupData.lng) {
+                try {
+                    await this.sock.sendMessage(jid, {
+                        location: {
+                            degreesLatitude: Number(groupData.lat),
+                            degreesLongitude: Number(groupData.lng),
+                            name: `🕌 Waktu Sholat ${nama}`,
+                            address: `${kota.toUpperCase()} - ${waktu} WIB`
+                        }
+                    });
+                } catch (err) {
+                    console.error('[SCHEDULER] Gagal mengirim location message:', err.message);
+                }
+            }
+
             const sent = await this.sock.sendMessage(jid, {
                 interactiveMessage: {
                     title: `${msg}\n`,
                     footer: '© EL-RUWET TEAM',
-                    thumbnail: bannerUrl,
                     nativeFlowMessage: {
                         buttons: [
                             {

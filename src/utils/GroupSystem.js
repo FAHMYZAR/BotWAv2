@@ -9,13 +9,16 @@ class GroupSystem {
         console.log('✅ GroupSystem using SQLite');
     }
 
-    async register(groupJid, kota, registeredBy = null) {
+    async register(groupJid, kota, registeredBy = null, lat = null, lng = null, mapsUrl = null) {
         try {
             const existing = await this.get(groupJid);
             Database.run(
-                `INSERT OR REPLACE INTO groups (group_id, kota, registered_at, registered_by, group_admins, last_notified) VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT OR REPLACE INTO groups (group_id, kota, latitude, longitude, maps_url, registered_at, registered_by, group_admins, last_notified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 groupJid,
                 kota.toLowerCase(),
+                lat,
+                lng,
+                mapsUrl,
                 existing ? existing.registered_at : Database.toTimestamp(),
                 registeredBy,
                 existing ? existing.group_admins : '[]',

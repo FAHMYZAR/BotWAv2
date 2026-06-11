@@ -68,6 +68,9 @@ class Database {
             CREATE TABLE IF NOT EXISTS groups (
                 group_id TEXT PRIMARY KEY,
                 kota TEXT NOT NULL DEFAULT '',
+                latitude REAL,
+                longitude REAL,
+                maps_url TEXT,
                 registered_at INTEGER NOT NULL,
                 registered_by TEXT,
                 group_admins TEXT NOT NULL DEFAULT '[]',
@@ -102,6 +105,17 @@ class Database {
                 last_notified TEXT NOT NULL DEFAULT '{}'
             );
         `);
+
+        this.ensureColumn('groups', 'latitude', 'REAL');
+        this.ensureColumn('groups', 'longitude', 'REAL');
+        this.ensureColumn('groups', 'maps_url', 'TEXT');
+    }
+
+    ensureColumn(table, column, type) {
+        const columns = this.db.query(`PRAGMA table_info(${table})`).all();
+        if (!columns.some((item) => item.name === column)) {
+            this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+        }
     }
 
     async initializeSystems() {

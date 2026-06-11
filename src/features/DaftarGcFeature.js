@@ -2,6 +2,7 @@ const BaseFeature = require('../core/BaseFeature');
 const GroupSystem = require('../utils/GroupSystem');
 const AdminHelper = require('../utils/AdminHelper');
 const config = require('../config/config');
+const axios = require('axios');
 
 class DaftarGcFeature extends BaseFeature {
     constructor() {
@@ -39,13 +40,33 @@ class DaftarGcFeature extends BaseFeature {
                 return;
             }
 
+            // Ambil data peta (latitude, longitude, maps_url) dari Google AI base URL
+            let lat = null, lng = null, mapsUrl = null;
+            try {
+                const mapsBaseUrl = String(config.googleAi?.baseUrl || 'http://localhost:9876').replace(/\/$/, '');
+                const authHeader = config.googleAi?.apiKey ? `Bearer ${config.googleAi.apiKey}` : 'Bearer sk-fahmyzzx-ganteng-banget-cihuyyyy';
+                
+                const placeRes = await axios.get(`${mapsBaseUrl}/maps/place?q=${encodeURIComponent(kota)}`, {
+                    headers: { 'Authorization': authHeader },
+                    timeout: 5000
+                });
+
+                if (placeRes.data && placeRes.data.success) {
+                    lat = placeRes.data.latitude;
+                    lng = placeRes.data.longitude;
+                    mapsUrl = placeRes.data.url;
+                }
+            } catch (err) {
+                console.error('[DAFTARGC] Gagal fetch Google Maps place API:', err.message);
+            }
+
             // Daftar grup dan ambil SEMUA admin grup
             const metadata = await sock.groupMetadata(groupId);
             const allAdmins = metadata.participants
                 .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
                 .map(p => p.id);
             
-            await GroupSystem.register(groupId, kota, senderId);
+            await GroupSystem.register(groupId, kota, senderId, lat, lng, mapsUrl);
             
             // Rebuild scheduler timers
             if (global.sholatScheduler) {
@@ -60,6 +81,7 @@ class DaftarGcFeature extends BaseFeature {
             let message = `✅ *GRUP BERHASIL DIDAFTARKAN!*\n\n`;
             message += `*Grup:* ${metadata.subject}\n`;
             message += `*Lokasi:* ${kota}\n`;
+            if (lat && lng) message += `*Maps:* ${lat}, ${lng}\n`;
             message += `*Didaftarkan oleh:* @${senderId.split('@')[0]}\n\n`;
             message += `🕌 *FITUR AKTIF:*\n`;
             message += `> Auto reminder sholat\n`;
