@@ -164,40 +164,24 @@ class SholatScheduler {
             const slug = kota.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
             const sourceUrl = `https://jadwal-sholat.kompas.com/${slug}`;
 
-            // Kirim Location Message jika koordinat tersedia
             if (groupData.lat && groupData.lng) {
                 try {
                     await this.sock.sendMessage(jid, {
                         location: {
                             degreesLatitude: Number(groupData.lat),
                             degreesLongitude: Number(groupData.lng),
-                            name: `🕌 Waktu Sholat ${nama}`,
-                            address: `${kota.toUpperCase()} - ${waktu} WIB`
+                            name: `🕌 ${nama.toUpperCase()} • ${kota.toUpperCase()}`,
+                            address: `${waktu} WIB • Sumber: Kompas • ${sourceUrl}`
                         }
                     });
                 } catch (err) {
                     console.error('[SCHEDULER] Gagal mengirim location message:', err.message);
+                    await this.sock.sendMessage(jid, { text: msg });
                 }
+            } else {
+                await this.sock.sendMessage(jid, { text: msg });
             }
-
-            const sent = await this.sock.sendMessage(jid, {
-                interactiveMessage: {
-                    title: `${msg}\n`,
-                    footer: '© EL-RUWET TEAM',
-                    nativeFlowMessage: {
-                        buttons: [
-                            {
-                                name: 'cta_url',
-                                buttonParamsJson: JSON.stringify({
-                                    display_text: 'Source Jadwal',
-                                    url: sourceUrl
-                                })
-                            }
-                        ]
-                    }
-                }
-            });
-            if (nama === 'Imsak' && sent?.key) this.imsakMessageCache.set(jid, sent.key);
+            if (nama === 'Imsak') this.imsakMessageCache.set(jid, null);
             console.log(`[SCHEDULER] Sent ${nama} to ${jid}`);
         } catch (e) {
             console.error(`[SCHEDULER] sendGroupReminder error:`, e.message);
