@@ -2,6 +2,7 @@ const axios = require('axios');
 const config = require('../config/config');
 const GroupSystem = require('./GroupSystem');
 const PersonalSholatSystem = require('./PersonalSholatSystem');
+const { generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
 
 class SholatScheduler {
     constructor(sock) {
@@ -166,16 +167,26 @@ class SholatScheduler {
 
             const footerText = `Sumber: Kompas\nUpdate: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
 
-            const thumbnail = groupData.lat && groupData.lng
-                ? `https://maps.googleapis.com/maps/api/staticmap?center=${Number(groupData.lat)},${Number(groupData.lng)}&zoom=15&size=640x360&markers=color:red%7C${Number(groupData.lat)},${Number(groupData.lng)}`
-                : undefined;
-
-            await this.sock.sendMessage(jid, {
-                interactiveMessage: {
-                    title: `${msg}\n`,
-                    footer: footerText,
-                    thumbnail,
-                    nativeFlowMessage: {
+            if (groupData.lat && groupData.lng) {
+                const interactiveMessagePayload = {
+                    body: proto.Message.InteractiveMessage.Body.create({
+                        text: `${msg}\n`
+                    }),
+                    footer: proto.Message.InteractiveMessage.Footer.create({
+                        text: footerText
+                    }),
+                    header: proto.Message.InteractiveMessage.Header.create({
+                        title: '',
+                        hasMediaAttachment: true,
+                        locationMessage: proto.Message.LocationMessage.create({
+                            degreesLatitude: Number(groupData.lat),
+                            degreesLongitude: Number(groupData.lng),
+                            name: kota.toUpperCase(),
+                            address: kota.toUpperCase(),
+                            url: groupData.mapsUrl || undefined
+                        })
+                    }),
+                    nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
                         buttons: [
                             {
                                 name: 'cta_url',
@@ -185,9 +196,44 @@ class SholatScheduler {
                                 })
                             }
                         ]
+                    })
+                };
+
+                const msgNode = generateWAMessageFromContent(jid, {
+                    viewOnceMessage: {
+                        message: {
+                            messageContextInfo: {
+                                deviceListMetadata: {},
+                                deviceListMetadataVersion: 2
+                            },
+                            interactiveMessage: proto.Message.InteractiveMessage.create(interactiveMessagePayload)
+                        }
                     }
-                }
-            });
+                }, { userJid: this.sock.user.id });
+
+                await this.sock.relayMessage(jid, msgNode.message, {
+                    messageId: msgNode.key.id
+                });
+            } else {
+                await this.sock.sendMessage(jid, {
+                    interactiveMessage: {
+                        title: `${msg}\n`,
+                        footer: footerText,
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: 'cta_url',
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: 'Source Jadwal',
+                                        url: sourceUrl
+                                    })
+                                }
+                            ]
+                        }
+                    }
+                });
+            }
+
             if (nama === 'Imsak') this.imsakMessageCache.set(jid, null);
             console.log(`[SCHEDULER] Sent ${nama} to ${jid}`);
         } catch (e) {
