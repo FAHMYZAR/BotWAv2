@@ -399,7 +399,7 @@ class ELFeature extends BaseFeature {
         });
     }
 
-    async finishStatus(sock, remoteJid, statusMessage, output) {
+    async finishStatus(sock, remoteJid, statusMessage, output, m) {
         if (statusMessage?.key) {
             const interval = this.statusTrackers.get(`${statusMessage.key.id}_interval`);
             if (interval) clearInterval(interval);
@@ -407,8 +407,46 @@ class ELFeature extends BaseFeature {
             this.statusTrackers.delete(statusMessage.key.id);
         }
 
+        // Cek apakah output berisi format Sumber
+        const sourceMatch = output.match(/>\s*_?Sumber:\s*(https?:\/\/[^\s_]+)_?\s*\n*>\s*_?Diperbarui:\s*([^\n_]+)_?/is);
+        
+        if (sourceMatch) {
+            const sourceUrl = sourceMatch[1];
+            const timestamp = sourceMatch[2].trim();
+            
+            // Buang baris sumber dari teks utama
+            const cleanOutput = output.replace(/>\s*_?Sumber:.*?>\s*_?Diperbarui:.*?_?/is, '').trim();
+            let hostname = sourceUrl;
+            try { hostname = new URL(sourceUrl).hostname; } catch {}
+            
+            const footerText = `Sumber: ${hostname}\n\nUpdate: ${timestamp}`;
+
+            // Hapus pesan status karena kita akan kirim interactive (gabisa di-edit)
+            if (statusMessage?.key) {
+                try { await sock.sendMessage(remoteJid, { delete: statusMessage.key }); } catch {}
+            }
+
+            return sock.sendMessage(remoteJid, {
+                interactiveMessage: {
+                    title: `${cleanOutput}\n`,
+                    footer: footerText,
+                    nativeFlowMessage: {
+                        buttons: [
+                            {
+                                name: 'cta_url',
+                                buttonParamsJson: JSON.stringify({
+                                    display_text: 'Kunjungi Sumber Asli',
+                                    url: sourceUrl
+                                })
+                            }
+                        ]
+                    }
+                }
+            }, { quoted: m });
+        }
+
         if (!statusMessage?.key) {
-            return sock.sendMessage(remoteJid, { text: output });
+            return sock.sendMessage(remoteJid, { text: output }, { quoted: m });
         }
 
         return sock.sendMessage(remoteJid, {
@@ -658,7 +696,7 @@ class ELFeature extends BaseFeature {
                 await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Media terdeteksi, membaca gambar...');
                 const output = normalizeOutput(await client.chat(buildVisionMessages(intent.refined_prompt, imageInput.buffer.toString('base64'), imageInput.mimeType)));
                 await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
-                await this.finishStatus(sock, remoteJid, statusMessage, output, this.getQuotedContextInfo(m));
+                await this.finishStatus(sock, remoteJid, statusMessage, output, m);
             } 
             else if (['generate_image', 'generate_sticker', 'edit_image', 'edit_sticker'].includes(intent.mode)) {
                 await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
@@ -681,7 +719,7 @@ class ELFeature extends BaseFeature {
             else {
                 const output = await this.handleChat(sock, remoteJid, statusMessage, startMs, buildFinalPrompt(intent.refined_prompt), client, intent);
                 await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
-                await this.finishStatus(sock, remoteJid, statusMessage, output, this.getQuotedContextInfo(m));
+                await this.finishStatus(sock, remoteJid, statusMessage, output, m);
             }
         } catch (error) {
             if (statusMessage?.key) {

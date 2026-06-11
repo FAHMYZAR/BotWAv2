@@ -125,14 +125,16 @@ class SholatScheduler {
         if (!this.isConnected) {
             console.log(`[SCHEDULER] Not connected, queueing ${nama} ${kota}`);
             for (const g of allGroups.filter(g => g.kota === kota)) {
-                this.retryQueue.set(`${g.groupId}_${nama}`, { groupJid: g.groupId, nama, waktu, kota, subuhTime });
+                const jid = g.group_id || g.groupId;
+                this.retryQueue.set(`${jid}_${nama}`, { groupJid: jid, nama, waktu, kota, subuhTime });
             }
             return;
         }
         for (const groupData of allGroups.filter(g => g.kota === kota)) {
-            const jid = groupData.groupId;
+            const jid = groupData.group_id || groupData.groupId;
             if (await GroupSystem.isNotifiedToday(jid, nama)) continue;
-            await this.sendGroupReminder(groupData, nama, waktu, kota, subuhTime);
+            // Rekonstruksi object supaya konsisten untuk sendGroupReminder
+            await this.sendGroupReminder({ groupId: jid, kota: groupData.kota }, nama, waktu, kota, subuhTime);
             await GroupSystem.updateLastNotified(jid, nama);
         }
         for (const userData of allUsers.filter(u => u.kota === kota)) {

@@ -26,7 +26,7 @@ class TestSholatFeature extends BaseFeature {
             }
 
             const groups = await GroupSystem.getAll();
-            const groupData = groups.find(g => g.groupId === groupId);
+            const groupData = groups.find(g => g.group_id === groupId);
 
             if (!groupData) {
                 await sock.sendMessage(groupId, { text: '❌ Grup ini belum didaftarkan untuk pengingat sholat. Gunakan .daftargc <kota>' });
@@ -54,8 +54,9 @@ class TestSholatFeature extends BaseFeature {
             setTimeout(async () => {
                 if (global.sholatScheduler) {
                     // Pakai sendGroupReminder dari scheduler yang sudah jalan
+                    // Kirimkan object format `groupId` untuk menyesuaikan dengan parameter SholatScheduler
                     await global.sholatScheduler.sendGroupReminder(
-                        groupData, 
+                        { groupId: groupData.group_id, kota: groupData.kota }, 
                         targetName, 
                         targetTime, 
                         kota, 
