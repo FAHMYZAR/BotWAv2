@@ -50,6 +50,12 @@ Gunakan hanya format berikut:
 - Tanda kutip (quote): > teks
 - Kode berderet: \`teks\`
 
+*SUMBER (WAJIB JIKA MENGGUNAKAN SEARCH):*
+- Jika jawaban berasal dari hasil pencarian web/search, WAJIB tuliskan satu baris di paling bawah yang berisi link sumber dan waktu pencarian.
+- Format sumber harus seperti ini:
+> _Sumber: [Link website utama]_
+> _Diperbarui: ${getCurrentJakartaDateTime()} WIB_
+
 Jangan menggunakan heading Markdown (# atau ##) atau tebal Markdown (**teks**).
 Gunakan plain text untuk matematika: x², 1/2, ×, ÷, √, π.
 
@@ -110,7 +116,7 @@ function buildAnswerMessages(finalPrompt, searchData) {
     return [
         {
             role: 'system',
-            content: buildSystemInstruction() + '\n\nJawab berdasarkan SEARCH_RESULT_FINAL. Jangan mengarang data realtime di luar hasil search. Prioritaskan hasil terbaru. Rapikan teks agar nyaman dibaca di WhatsApp.'
+            content: buildSystemInstruction() + '\n\nJawab berdasarkan SEARCH_RESULT_FINAL. Jangan mengarang data realtime di luar hasil search. Prioritaskan hasil terbaru. Rapikan teks agar nyaman dibaca di WhatsApp. PASTIKAN SELALU MENAMBAHKAN SUMBER DAN TIMESTAMP DI AKHIR JAWABAN BERDASARKAN HASIL SEARCH.'
         },
         {
             role: 'user',

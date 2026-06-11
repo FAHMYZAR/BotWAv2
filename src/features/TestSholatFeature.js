@@ -1,9 +1,10 @@
 const BaseFeature = require('../core/BaseFeature');
 const GroupSystem = require('../utils/GroupSystem');
+const AdminHelper = require('../utils/AdminHelper');
 
 class TestSholatFeature extends BaseFeature {
     constructor() {
-        super('testsholat', 'Test schedule pengingat sholat di grup ini', true, 'owner');
+        super('testsholat', 'Test schedule pengingat sholat di grup ini', false, 'group');
     }
 
     async execute(m, sock, args) {
@@ -14,6 +15,16 @@ class TestSholatFeature extends BaseFeature {
             }
 
             const groupId = m.key.remoteJid;
+            const senderId = m.key.participant || m.key.remoteJid;
+            const config = require('../config/config');
+            const isOwner = m.key.fromMe || senderId.replace('@s.whatsapp.net', '') === config.ownerNumber;
+            const isGroupAdmin = await AdminHelper.isGroupAdmin(sock, groupId, senderId);
+
+            if (!isOwner && !isGroupAdmin) {
+                await sock.sendMessage(groupId, { text: '❌ Hanya owner bot atau admin grup yang bisa test sholat!' });
+                return;
+            }
+
             const groups = await GroupSystem.getAll();
             const groupData = groups.find(g => g.groupId === groupId);
 
@@ -24,7 +35,7 @@ class TestSholatFeature extends BaseFeature {
 
             // Baca delay dari argumen, default 5 detik
             let delaySeconds = 5;
-            if (args.length > 0 && !isNaN(args[0])) {
+            if (args.length > 0 && !isNaN(parseInt(args[0]))) {
                 delaySeconds = parseInt(args[0]);
             }
             const delayMs = delaySeconds * 1000;
