@@ -48,7 +48,7 @@ class DaftarGcFeature extends BaseFeature {
                 
                 const placeRes = await axios.get(`${mapsBaseUrl}/maps/place?q=${encodeURIComponent(kota)}`, {
                     headers: { 'Authorization': authHeader },
-                    timeout: 5000
+                    timeout: 15000
                 });
 
                 if (placeRes.data && placeRes.data.success) {
