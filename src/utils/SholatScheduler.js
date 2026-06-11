@@ -174,27 +174,28 @@ class SholatScheduler {
                         name: kota.toUpperCase(),
                         address: kota.toUpperCase(),
                         url: groupData.mapsUrl || undefined
+                    },
+                    caption: `${msg}\n\n${footerText}`
+                });
+            } else {
+                await this.sock.sendMessage(jid, {
+                    interactiveMessage: {
+                        title: `${msg}\n`,
+                        footer: footerText,
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: 'cta_url',
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: 'Source Jadwal',
+                                        url: sourceUrl
+                                    })
+                                }
+                            ]
+                        }
                     }
                 });
             }
-
-            await this.sock.sendMessage(jid, {
-                interactiveMessage: {
-                    title: `${msg}\n`,
-                    footer: footerText,
-                    nativeFlowMessage: {
-                        buttons: [
-                            {
-                                name: 'cta_url',
-                                buttonParamsJson: JSON.stringify({
-                                    display_text: 'Source Jadwal',
-                                    url: sourceUrl
-                                })
-                            }
-                        ]
-                    }
-                }
-            });
             if (nama === 'Imsak') this.imsakMessageCache.set(jid, null);
             console.log(`[SCHEDULER] Sent ${nama} to ${jid}`);
         } catch (e) {
