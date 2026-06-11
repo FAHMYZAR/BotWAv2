@@ -166,11 +166,22 @@ class SholatScheduler {
 
             const footerText = `Sumber: Kompas\nUpdate: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
 
+            if (groupData.lat && groupData.lng) {
+                await this.sock.sendMessage(jid, {
+                    location: {
+                        degreesLatitude: Number(groupData.lat),
+                        degreesLongitude: Number(groupData.lng),
+                        name: kota.toUpperCase(),
+                        address: kota.toUpperCase(),
+                        url: groupData.mapsUrl || undefined
+                    }
+                });
+            }
+
             await this.sock.sendMessage(jid, {
                 interactiveMessage: {
                     title: `${msg}\n`,
                     footer: footerText,
-                    thumbnail: this.getRandomBanner(),
                     nativeFlowMessage: {
                         buttons: [
                             {
