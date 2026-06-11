@@ -110,7 +110,7 @@ function buildAnswerMessages(finalPrompt, searchData) {
     return [
         {
             role: 'system',
-            content: buildSystemInstruction() + '\n\nJawab berdasarkan SEARCH_RESULT_FINAL. Jangan mengarang data realtime di luar hasil search. Prioritaskan hasil terbaru. Kalau data realtime belum cukup jelas, katakan hasil search belum cukup akurat.'
+            content: buildSystemInstruction() + '\n\nJawab berdasarkan SEARCH_RESULT_FINAL. Jangan mengarang data realtime di luar hasil search. Prioritaskan hasil terbaru. Rapikan teks agar nyaman dibaca di WhatsApp.'
         },
         {
             role: 'user',
@@ -532,14 +532,20 @@ class ELFeature extends BaseFeature {
         let rawAnswer = null;
 
         if (intent?.needs_search) {
-            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Coba Google AI search...');
-            rawAnswer = await getGoogleAiSearchData(
+            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Coba Google search...');
+            
+            // Ambil data mentah (raw) dari Google AI
+            const googleRaw = await getGoogleAiSearchData(
                 intent.refined_prompt || finalPrompt,
-                buildSystemInstruction() + '\n\nJika memakai hasil pencarian, jawab final dengan format yang rapi untuk WhatsApp. Gunakan *tebal*, _miring_, bullet yang singkat, dan paragraf pendek. Jangan pakai markdown `**` atau heading markdown. Langsung beri jawaban final, bukan catatan proses pencarian.'
+                'Jawab hanya dengan data atau fakta relevan, tidak perlu dirapikan atau diberi salam.'
             );
 
-            if (!rawAnswer) {
-                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Google AI gagal, fallback search...');
+            if (googleRaw) {
+                // Gunakan vpscombo untuk merapikan hasil Google AI
+                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan jawaban search...');
+                rawAnswer = await client.chat(buildAnswerMessages(finalPrompt, { source: "Google ", data: googleRaw }), config.router?.chatModel || 'vpscombo');
+            } else {
+                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Google gagal, fallback search...');
                 const searchData = await client.search(intent.refined_prompt || finalPrompt, 8);
                 rawAnswer = await client.chat(buildAnswerMessages(finalPrompt, searchData), config.router?.chatModel || 'vpscombo');
             }
@@ -556,7 +562,7 @@ class ELFeature extends BaseFeature {
             ], config.router?.chatModel || 'vpscombo');
         }
 
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan jawaban...');
+        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan format...');
         let output = normalizeOutput(rawAnswer);
 
         if (!output) {

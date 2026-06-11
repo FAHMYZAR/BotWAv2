@@ -85,13 +85,33 @@ class SholatScheduler {
             for (const prayer of prayers) {
                 if (!prayer.time) continue;
                 const [h, m] = prayer.time.split(':').map(Number);
-                const target = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
-                target.setHours(h, m, 0, 0);
                 
-                // Because Date.now() is absolute, we need to compare target's absolute time.
-                // It is simpler to just calculate target time from the start of the day in WIB:
-                const localNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
-                const delay = target.getTime() - localNow.getTime();
+                // Cari waktu target hari ini di WIB (Asia/Jakarta)
+                const now = new Date();
+                
+                // Buat tanggal target hari ini di timezone Jakarta
+                const formatterWib = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'Asia/Jakarta',
+                    year: 'numeric',
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric',
+                    second: 'numeric',
+                    hour12: false
+                });
+
+                const parts = formatterWib.formatToParts(now);
+                const wibYear = Number(parts.find(p => p.type === 'year').value);
+                const wibMonth = Number(parts.find(p => p.type === 'month').value) - 1; // 0-indexed month
+                const wibDay = Number(parts.find(p => p.type === 'day').value);
+
+                // Buat Date target dalam format UTC berdasarkan waktu WIB yang diinginkan
+                // Mengingat Jakarta adalah UTC+7, kita bisa menghitung waktu UTC dari jam WIB
+                // UTC = WIB - 7 jam
+                const targetUtc = Date.UTC(wibYear, wibMonth, wibDay, h - 7, m, 0, 0);
+                const currentUtc = now.getTime(); // Waktu absolut saat ini
+                const delay = targetUtc - currentUtc;
                 
                 if (delay <= 0) continue;
                 const timer = setTimeout(() => this.handlePrayerTime(kota, prayer.name, prayer.time, groups, personalUsers, jadwal.subuh), delay);
