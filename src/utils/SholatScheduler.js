@@ -165,7 +165,7 @@ class SholatScheduler {
             const slug = kota.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
             const sourceUrl = `https://jadwal-sholat.kompas.com/${slug}`;
 
-            const footerText = `Sumber: Kompas\nUpdate: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
+            const footerText = `Sumber: Kompas x EL-Ruwet\nTanggal: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
 
             if (groupData.lat && groupData.lng) {
                 const interactiveMessagePayload = {
