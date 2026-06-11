@@ -182,7 +182,7 @@ class SholatScheduler {
                             degreesLatitude: Number(groupData.lat),
                             degreesLongitude: Number(groupData.lng),
                             name: kota.toUpperCase(),
-                            address: kota.toUpperCase(),
+                            address: 'Area dan sekitarnya',
                             url: groupData.mapsUrl || undefined
                         })
                     }),
