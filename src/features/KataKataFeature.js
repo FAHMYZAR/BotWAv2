@@ -18,11 +18,9 @@ class KataKataFeature extends BaseFeature {
         return this.quoteTypes[randomIndex];
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '💭', key: m.key }
-            });
+            await ctx.react('💭');
 
             const quoteType = this.getRandomQuoteType();
             
@@ -32,33 +30,21 @@ class KataKataFeature extends BaseFeature {
             });
 
             if (!response.data.success || !response.data.result) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal mengambil kata-kata!' 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text('❌ Gagal mengambil kata-kata!');
                 return;
             }
 
             const quote = response.data.result;
             
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, {
-                text: quote
-            });
+            await client.send(ctx.remoteJid).text(quote);
 
         } catch (error) {
             console.error('KataKata error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mengambil kata-kata!' 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat mengambil kata-kata!');
         }
     }
 }

@@ -6,27 +6,23 @@ class BratFeature extends BaseFeature {
         super('brat', 'Membuat stiker brat', false, 'media');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             let text = args.join(' ');
 
             // Check if replying to a message
-            if (!text && m.message.extendedTextMessage?.contextInfo?.quotedMessage) {
-                const quotedText = m.message.extendedTextMessage.contextInfo.quotedMessage.conversation ||
-                                  m.message.extendedTextMessage.contextInfo.quotedMessage.extendedTextMessage?.text ||
+            if (!text && (await ctx.replied().catch(()=>null))?.message) {
+                const quotedText = (await ctx.replied().catch(()=>null))?.message.conversation ||
+                                  (await ctx.replied().catch(()=>null))?.message.extendedTextMessage?.text ||
                                   '';
                 text = quotedText;
             }
 
             if (!text) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Masukkan teks atau reply pesan!\n\nContoh:\n> .brat hello world\n> Reply pesan + .brat' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Masukkan teks atau reply pesan!\n\nContoh:\n> .brat hello world\n> Reply pesan + .brat');
                 return;
             }
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '⏳', key: m.key }
-            });
+            await ctx.react('⏳');
 
             const imageBuffer = await bratGenerator(text);
             
@@ -40,16 +36,12 @@ class BratFeature extends BaseFeature {
                 .webp({ quality: 95 })
                 .toBuffer();
             
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { sticker: stickerBuffer });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).sticker(stickerBuffer );
 
         } catch (error) {
             console.error('Brat error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Gagal membuat Brat Sticker. Coba lagi nanti.' 
-            });
+            await client.send(ctx.remoteJid).text('❌ Gagal membuat Brat Sticker. Coba lagi nanti.');
         }
     }
 }

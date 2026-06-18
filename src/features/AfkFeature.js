@@ -6,22 +6,20 @@ class AfkFeature extends BaseFeature {
         super('afk', 'Set status AFK dengan alasan', false, 'fun');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const userId = m.key.participant || m.key.remoteJid;
+            const userId = ctx.senderJid || ctx.remoteJid;
             const reason = args.join(' ') || 'Tidak ada alasan';
-            const name = m.pushName || 'User';
+            const name = ctx.senderName || 'User';
 
             await AfkSystem.setAfk(userId, reason, name);
 
-            await sock.sendMessage(m.key.remoteJid, {
-                text: `*${name}* sekarang AFK\nAlasan: ${reason}`,
-                mentions: [userId]
-            });
+            await client.send(ctx.remoteJid).text(`*${name}* sekarang AFK\nAlasan: ${reason}`).mentions([userId]
+            );
 
         } catch (error) {
             console.error('Afk error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal set AFK!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal set AFK!');
         }
     }
 }

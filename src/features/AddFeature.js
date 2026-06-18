@@ -6,48 +6,45 @@ class AddFeature extends BaseFeature {
         super('add', 'Tambah member ke grup', false, 'admin');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.roomId;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await ctx.reply('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderId;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa add member!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await ctx.reply('❌ Hanya admin yang bisa add member!');
                 return;
             }
 
-            if (!await AdminHelper.isBotAdmin(sock, groupId)) {
-                await sock.sendMessage(groupId, { text: '❌ Bot harus jadi admin untuk add member!' });
+            if (!await AdminHelper.isBotAdmin(client, groupId)) {
+                await ctx.reply('❌ Bot harus jadi admin untuk add member!');
                 return;
             }
 
             const phoneNumber = args[0];
             
             if (!phoneNumber) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Berikan nomor yang ingin ditambahkan!\n\nContoh:\n> `.add 628123456789`\n> `.add 08123456789`' 
-                });
+                await ctx.reply('❌ Berikan nomor yang ingin ditambahkan!\n\nContoh:\n> `.add 628123456789`\n> `.add 08123456789`');
                 return;
             }
 
             const targetJid = AdminHelper.formatPhoneNumber(phoneNumber);
 
-            const [result] = await sock.onWhatsApp(targetJid);
+            const [result] = await client.onWhatsApp(targetJid);
             if (!result || !result.exists) {
-                await sock.sendMessage(groupId, { text: '❌ Nomor tidak terdaftar di WhatsApp!' });
+                await ctx.reply('❌ Nomor tidak terdaftar di WhatsApp!');
                 return;
             }
 
-            await sock.groupParticipantsUpdate(groupId, [targetJid], 'add');
+            await client.group.addMember(groupId, [targetJid]);
             
-            await sock.sendMessage(groupId, { 
-                text: `✅ Member berhasil ditambahkan!`,
+            await ctx.reply(`✅ Member berhasil ditambahkan!`, {
                 mentions: [targetJid]
             });
 
@@ -61,7 +58,7 @@ class AddFeature extends BaseFeature {
                 errorMsg = '❌ Member sudah ada di grup!';
             }
             
-            await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
+            await ctx.reply(errorMsg);
         }
     }
 }

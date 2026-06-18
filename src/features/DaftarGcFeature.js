@@ -9,34 +9,28 @@ class DaftarGcFeature extends BaseFeature {
         super('daftargc', 'Daftarkan grup (admin grup bisa daftar)', false, 'group');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
-            const senderId = m.key.participant || m.key.remoteJid;
-            const isOwner = m.key.fromMe || senderId.replace('@s.whatsapp.net', '') === config.ownerNumber;
+            const groupId = ctx.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
+            const isOwner = ctx.isFromMe || senderId.replace('@s.whatsapp.net', '') === config.ownerNumber;
 
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Perintah ini hanya bisa digunakan di grup!' 
-                });
+                await client.send(groupId).text('❌ Perintah ini hanya bisa digunakan di grup!');
                 return;
             }
 
             // Cek apakah user adalah owner bot atau admin grup
-            const isGroupAdmin = await AdminHelper.isGroupAdmin(sock, groupId, senderId);
+            const isGroupAdmin = await AdminHelper.isGroupAdmin(client, groupId, senderId);
             
             if (!isOwner && !isGroupAdmin) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Hanya owner bot atau admin grup yang bisa daftarkan grup!' 
-                });
+                await client.send(groupId).text('❌ Hanya owner bot atau admin grup yang bisa daftarkan grup!');
                 return;
             }
 
             const kota = args.join(' ');
             if (!kota) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Masukkan nama kota!\n\nContoh:\n> `/daftargc Bantul`\n> `.daftargc Yogyakarta`' 
-                });
+                await client.send(groupId).text('❌ Masukkan nama kota!\n\nContoh:\n> `/daftargc Bantul`\n> `.daftargc Yogyakarta`');
                 return;
             }
 
@@ -61,7 +55,7 @@ class DaftarGcFeature extends BaseFeature {
             }
 
             // Daftar grup dan ambil SEMUA admin grup
-            const metadata = await sock.groupMetadata(groupId);
+            const metadata = await client.group.metadata(groupId);
             const allAdmins = metadata.participants
                 .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
                 .map(p => p.id);
@@ -93,16 +87,12 @@ class DaftarGcFeature extends BaseFeature {
             });
             message += `\n_Semua admin sekarang punya akses owner!_`;
 
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions: [senderId, ...allAdmins]
-            });
+            await client.send(groupId).text(message).mentions([senderId, ...allAdmins]
+            );
 
         } catch (error) {
             console.error('DaftarGc error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan!' 
-            });
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan!');
         }
     }
 }

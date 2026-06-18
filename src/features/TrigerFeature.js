@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const sharp = require('sharp');
 const { createCanvas, loadImage } = require('canvas');
 
@@ -8,46 +7,24 @@ class TrigerFeature extends BaseFeature {
         super('triger', 'Buat efek "triggered" deep-fried', false, 'fun');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            let imageBuffer;
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
-            const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = m.message.imageMessage || quoted?.imageMessage;
-            const stickerMessage = m.message.stickerMessage || quoted?.stickerMessage;
-
-            if (!imageMessage && !stickerMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Kirim gambar/sticker atau reply gambar/sticker!' 
-                });
+            if (!buffer) {
+                await ctx.reply('❌ Kirim gambar/sticker atau reply gambar/sticker!');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { text: '⏳ Deep frying...' });
+            await ctx.react('⏳');
 
-            if (imageMessage) {
-                imageBuffer = await downloadMediaMessage(
-                    { message: { imageMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-            } else {
-                imageBuffer = await downloadMediaMessage(
-                    { message: { stickerMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-            }
-            
-            // Step 1: Deep fry - kompresi brutal + saturasi ekstrem (dengan alpha channel)
-            let deepFried = await sharp(imageBuffer)
+            let deepFried = await sharp(buffer)
                 .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
                 .toFormat('png')
                 .toBuffer();
             
-            // Step 2: Saturasi & brightness ekstrem
             deepFried = await sharp(deepFried)
                 .modulate({
                     brightness: 1.0,
@@ -58,18 +35,15 @@ class TrigerFeature extends BaseFeature {
                 .toFormat('png')
                 .toBuffer();
             
-            // Step 3: Buat swirl effect dengan canvas
             const canvas = createCanvas(512, 512);
-            const ctx = canvas.getContext('2d');
+            const canvasCtx = canvas.getContext('2d');
             
-            // Load gambar deep fried ke canvas
             const img = await loadImage(deepFried);
-            ctx.drawImage(img, 0, 0, 512, 512);
+            canvasCtx.drawImage(img, 0, 0, 512, 512);
             
-            // Tambah emoji colorful SEBELUM swirl (biar kena efek swirl)
             const emojis = ['😂', '💀', '🔥', '💯', '😭', '🤣', '👌', '💥'];
             const colors = ['#FF0000', '#FF6B00', '#FFD700', '#00FF00', '#00FFFF', '#0080FF', '#FF00FF', '#FF1493'];
-            ctx.font = 'bold 60px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+            canvasCtx.font = 'bold 60px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
             
             for (let i = 0; i < 8; i++) {
                 const emoji = emojis[Math.floor(Math.random() * emojis.length)];
@@ -78,33 +52,28 @@ class TrigerFeature extends BaseFeature {
                 const y = Math.random() * 450 + 30;
                 const rotation = Math.random() * Math.PI * 2;
                 
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(rotation);
-                ctx.globalAlpha = 0.8;
-                
-                // Glow effect
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 15;
-                ctx.fillStyle = color;
-                
-                ctx.fillText(emoji, 0, 0);
-                ctx.restore();
+                canvasCtx.save();
+                canvasCtx.translate(x, y);
+                canvasCtx.rotate(rotation);
+                canvasCtx.globalAlpha = 0.8;
+                canvasCtx.shadowColor = color;
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.fillStyle = color;
+                canvasCtx.fillText(emoji, 0, 0);
+                canvasCtx.restore();
             }
             
-            // Apply swirl effect di posisi random
-            const centerX = Math.random() * 312 + 100; // Random X: 100-412
-            const centerY = Math.random() * 312 + 100; // Random Y: 100-412
+            const centerX = Math.random() * 312 + 100;
+            const centerY = Math.random() * 312 + 100;
             const radius = 120;
             const strength = 0.4;
             
-            // Get image data untuk swirl (ambil dari canvas yang sudah ada emoji)
             const tempCanvas = createCanvas(512, 512);
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.drawImage(canvas, 0, 0);
             const tempData = tempCtx.getImageData(0, 0, 512, 512);
             
-            const imageData = ctx.getImageData(0, 0, 512, 512);
+            const imageData = canvasCtx.getImageData(0, 0, 512, 512);
             const pixels = imageData.data;
             
             for (let y = 0; y < 512; y++) {
@@ -135,27 +104,20 @@ class TrigerFeature extends BaseFeature {
                 }
             }
             
-            ctx.putImageData(imageData, 0, 0);
+            canvasCtx.putImageData(imageData, 0, 0);
             
             const swirlBuffer = canvas.toBuffer('image/png');
             
-            // Step 4: Apply saturasi ke emoji juga
             const triggeredImage = await sharp(swirlBuffer)
-                .modulate({
-                    saturation: 1.3 // Saturasi ringan untuk emoji
-                })
+                .modulate({ saturation: 1.3 })
                 .webp({ quality: 80 })
                 .toBuffer();
 
-            await sock.sendMessage(m.key.remoteJid, {
-                sticker: triggeredImage
-            });
+            await client.send(ctx.roomId).sticker(triggeredImage);
 
         } catch (error) {
             console.error('Triger error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Gagal membuat triggered effect!' 
-            });
+            await ctx.reply('❌ Gagal membuat triggered effect!');
         }
     }
 }

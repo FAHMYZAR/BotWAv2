@@ -6,9 +6,9 @@ class AmbilKodeFeature extends BaseFeature {
         super('ambilkode', 'Ambil kode presensi dari jadwal kuliah', false, 'info');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             let type = 'rpl'; // default to RPL
             if (args.length > 0 && ['rpl', 'ds'].includes(args[0].toLowerCase())) {
@@ -18,12 +18,8 @@ class AmbilKodeFeature extends BaseFeature {
             const data = await fetchJadwalKuliah(type);
 
             if (data.kuliah?.isHtml) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `*Login Gagal!*\n\n${data.kuliah?.message}\n Server RAISING bermasalah` 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text(`*Login Gagal!*\n\n${data.kuliah?.message}\n Server RAISING bermasalah`);
                 return;
             }
 
@@ -49,12 +45,8 @@ class AmbilKodeFeature extends BaseFeature {
             const displayType = type === 'ds' ? 'DATA-SCIENCE' : type.toUpperCase();
 
             if (uniqueKuliah.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `*KODE PRESENSI ${displayType} ${todayName.toUpperCase()}*\n\n❌ Tidak ada jadwal kuliah hari ini!` 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text(`*KODE PRESENSI ${displayType} ${todayName.toUpperCase()}*\n\n❌ Tidak ada jadwal kuliah hari ini!`);
                 return;
             }
 
@@ -83,14 +75,12 @@ class AmbilKodeFeature extends BaseFeature {
                 message += '_Semua kode presensi belum dibuka_';
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
             if (lastKode) {
-                await sock.sendMessage(m.key.remoteJid, {
+                await client.sendMessage(ctx.remoteJid, {
                     interactiveMessage: {
-                        title: message,
+                        title: `${message}\n`,
                         footer: 'EL-RUWET BOT',
                         nativeFlowMessage: {
                             buttons: [
@@ -113,17 +103,13 @@ class AmbilKodeFeature extends BaseFeature {
                     }
                 });
             } else {
-                await sock.sendMessage(m.key.remoteJid, { text: message });
+                await client.send(ctx.remoteJid).text(message);
             }
 
         } catch (error) {
             console.error('AmbilKode error:', error);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `Terjadi kesalahan saat mengambil kode presensi!\n\nError: ${error.message}` 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text(`Terjadi kesalahan saat mengambil kode presensi!\n\nError: ${error.message}`);
         }
     }
 }

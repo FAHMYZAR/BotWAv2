@@ -7,23 +7,17 @@ class HadisFeature extends BaseFeature {
         super('hadis', 'Dapatkan hadis acak dari Ensiklopedia Hadis', false, 'info');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '📖', key: m.key }
-            });
+            await ctx.react('📖');
 
             const response = await axios.get(config.apis.myquran.hadis.random, {
                 timeout: 10000
             });
 
             if (!response.data.status || !response.data.data) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal mengambil hadis!' 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text('❌ Gagal mengambil hadis!');
                 return;
             }
 
@@ -38,31 +32,14 @@ class HadisFeature extends BaseFeature {
                 message += `\n\n*Hikmah:*\n${hadis.hikmah}`;
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, {
-                text: message,
-                contextInfo: {
-                    externalAdReply: {
-                        title: 'Hadis Ensiklopedia',
-                        body: `ID: ${hadis.id} • ${hadis.grade}`,
-                        thumbnailUrl: 'https://files.catbox.moe/iu92u8.jpg',
-                        mediaType: 1,
-                        renderLargerThumbnail: true
-                    }
-                }
-            });
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('Hadis error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mengambil hadis!' 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat mengambil hadis!');
         }
     }
 

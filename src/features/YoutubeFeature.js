@@ -7,18 +7,18 @@ class YoutubeFeature extends BaseFeature {
         super('yt', 'Download video YouTube', false, 'download');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const url = args[0];
 
             if (!url || !url.includes('youtu')) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Berikan URL YouTube yang valid!\n\nContoh: .yt https://youtu.be/xxxxx' 
                 });
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             let downloadUrl, title;
             
@@ -92,11 +92,9 @@ class YoutubeFeature extends BaseFeature {
                 `> \`${sizeInMB} MB\`\n\n` +
                 `_🔥 Downloaded by EL-RUWET [BOT + AI]_`;
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 video: videoBuffer,
                 caption: caption,
                 gifPlayback: false,
@@ -105,10 +103,8 @@ class YoutubeFeature extends BaseFeature {
 
         } catch (error) {
             console.error('YouTube error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
+            await ctx.react('');
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Terjadi kesalahan saat download! Video mungkin terlalu besar, private, atau tidak tersedia.' 
             });
         }
@@ -116,3 +112,4 @@ class YoutubeFeature extends BaseFeature {
 }
 
 module.exports = YoutubeFeature;
+

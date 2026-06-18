@@ -7,26 +7,26 @@ class WarnListFeature extends BaseFeature {
         super('warnlist', 'Lihat daftar warning di grup', false, 'admin');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.remoteJid;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa lihat warning list!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await client.send(groupId).text('❌ Hanya admin yang bisa lihat warning list!');
                 return;
             }
 
             const allWarns = await WarnSystem.getAllWarnsInGroup(groupId);
             
             if (allWarns.length === 0) {
-                await sock.sendMessage(groupId, { text: '✅ Tidak ada member yang punya warning!' });
+                await client.send(groupId).text('✅ Tidak ada member yang punya warning!');
                 return;
             }
 
@@ -47,14 +47,12 @@ class WarnListFeature extends BaseFeature {
 
             const mentions = allWarns.map(w => w.userId);
 
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions: mentions
-            });
+            await client.send(groupId).text(message).mentions(mentions
+            );
 
         } catch (error) {
             console.error('WarnList error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal menampilkan warning list!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal menampilkan warning list!');
         }
     }
 }

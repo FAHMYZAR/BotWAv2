@@ -7,36 +7,34 @@ class GroupOpenFeature extends BaseFeature {
         this.aliases = ['unmute'];
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.remoteJid;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa open grup!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await client.send(groupId).text('❌ Hanya admin yang bisa open grup!');
                 return;
             }
 
-            if (!await AdminHelper.isBotAdmin(sock, groupId)) {
-                await sock.sendMessage(groupId, { text: '❌ Bot harus jadi admin untuk open grup!' });
+            if (!await AdminHelper.isBotAdmin(client, groupId)) {
+                await client.send(groupId).text('❌ Bot harus jadi admin untuk open grup!');
                 return;
             }
 
-            await sock.groupSettingUpdate(groupId, 'not_announcement');
+            await client.group.setting(groupId, 'not_announcement');
             
-            await sock.sendMessage(groupId, { 
-                text: `🔓 *GRUP DIBUKA*\n\nSemua member bisa mengirim pesan!` 
-            });
+            await client.send(groupId).text(`🔓 *GRUP DIBUKA*\n\nSemua member bisa mengirim pesan!`);
 
         } catch (error) {
             console.error('GroupOpen error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal membuka grup!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal membuka grup!');
         }
     }
 }

@@ -10,25 +10,21 @@ class InstagramFeature extends BaseFeature {
         super('ig', 'Download video/foto Instagram (reel/post)', false, 'download');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const url = args[0];
 
             if (!url || !url.includes('instagram.com')) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '📸 *INSTAGRAM DOWNLOADER*\n\n❌ Berikan URL Instagram yang valid!\n\n*SUPPORT*\n> Reel\n> Post\n\n*CONTOH*\n> .ig https://instagram.com/reel/xxxxx\n> .ig https://instagram.com/p/xxxxx' 
-                });
+                await client.send(ctx.remoteJid).text('📸 *INSTAGRAM DOWNLOADER*\n\n❌ Berikan URL Instagram yang valid!\n\n*SUPPORT*\n> Reel\n> Post\n\n*CONTOH*\n> .ig https://instagram.com/reel/xxxxx\n> .ig https://instagram.com/p/xxxxx');
                 return;
             }
 
             if (url.includes('/stories/')) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '📸 *INSTAGRAM DOWNLOADER*\n\n❌ Story tidak support!\n\n*SUPPORT*\n> Reel\n> Post' 
-                });
+                await client.send(ctx.remoteJid).text('📸 *INSTAGRAM DOWNLOADER*\n\n❌ Story tidak support!\n\n*SUPPORT*\n> Reel\n> Post');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const response = await axios.get(`${config.apis.instagram}/igdl`, {
                 params: { url },
@@ -41,9 +37,7 @@ class InstagramFeature extends BaseFeature {
 
             const mediaData = response.data.url.data;
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
             // Remove duplicates based on URL
             const uniqueMedia = [];
@@ -79,15 +73,10 @@ class InstagramFeature extends BaseFeature {
                     console.log(`Media ${i + 1}: magic=${magicBytes.substring(0, 16)}, content-type=${contentType}, isVideo=${isVideo}`);
 
                     if (isVideo) {
-                        await sock.sendMessage(m.key.remoteJid, {
-                            video: buffer,
-                            caption: caption
-                        });
+                        await client.send(ctx.remoteJid).video(buffer, { caption: caption });
                     } else {
-                        await sock.sendMessage(m.key.remoteJid, {
-                            image: buffer,
-                            caption: caption
-                        });
+                        await client.send(ctx.remoteJid).image(buffer, { caption: caption
+                         });
                     }
 
                     // Delay between multiple media
@@ -101,12 +90,8 @@ class InstagramFeature extends BaseFeature {
 
         } catch (error) {
             console.error('Instagram error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat download! Pastikan URL valid dan konten tidak private.' 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat download! Pastikan URL valid dan konten tidak private.');
         }
     }
 }

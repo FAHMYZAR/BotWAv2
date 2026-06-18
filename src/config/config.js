@@ -5,7 +5,6 @@ class Config {
         this.ownerPrefix = process.env.OWNER_PREFIX || '/';
         this.userPrefix = process.env.USER_PREFIX || '.';
         this.ownerNumber = process.env.OWNER_NUMBER || '6285878556744';
-        this.ownerNumberFormatted = `${this.ownerNumber}@c.us`;
         
         // Load from JSON
         this.protectedNumbers = ProtectionSystem.data.numbers;

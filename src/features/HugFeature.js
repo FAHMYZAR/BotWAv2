@@ -8,11 +8,9 @@ class HugFeature extends BaseFeature {
         super('hug', 'Random hug anime sticker', false, 'fun');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '❤️', key: m.key }
-            });
+            await ctx.react('❤️');
 
             const response = await axios.get(`${config.apis.lolhuman}/random/sfw/hug`, {
                 params: { apikey: config.lolhumanApiKey },
@@ -24,13 +22,13 @@ class HugFeature extends BaseFeature {
                 .webp({ quality: 95 })
                 .toBuffer();
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 sticker: webp
             });
 
         } catch (error) {
             console.error('Hug error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Gagal mengirim pelukan!' 
             });
         }
@@ -38,3 +36,4 @@ class HugFeature extends BaseFeature {
 }
 
 module.exports = HugFeature;
+

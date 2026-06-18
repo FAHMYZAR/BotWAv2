@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
@@ -11,53 +10,22 @@ class ToUrlFeature extends BaseFeature {
         super('tourl', 'Mengubah media menjadi URL', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = m.message.imageMessage || quoted?.imageMessage;
-            const videoMessage = m.message.videoMessage || quoted?.videoMessage;
-
-            if (!imageMessage && !videoMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Reply atau kirim gambar/video dengan caption .tourl' 
-                });
-                return;
-            }
-
-            await sock.sendMessage(m.key.remoteJid, { text: '⏳ Mengupload media...' });
-
-            let buffer;
-            let mime;
-
-            if (imageMessage) {
-                buffer = await downloadMediaMessage(
-                    { message: { imageMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-                mime = 'image';
-            } else {
-                buffer = await downloadMediaMessage(
-                    { message: { videoMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-                mime = 'video';
-            }
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
             if (!buffer) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal mengunduh media!' 
-                });
+                await ctx.reply('❌ Reply atau kirim gambar/video dengan caption .tourl');
                 return;
             }
 
+            await ctx.reply('⏳ Mengupload media...');
+
+            const mime = media.type === 'video' ? 'video' : 'image';
             const tempDir = path.join(__dirname, '../../temp');
-            if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
-            }
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
             const tempFileName = `temp_${Date.now()}.${mime === 'image' ? 'jpg' : 'mp4'}`;
             const tempPath = path.join(tempDir, tempFileName);
@@ -74,20 +42,14 @@ class ToUrlFeature extends BaseFeature {
             fs.unlinkSync(tempPath);
 
             if (res.data && typeof res.data === 'string' && res.data.startsWith('https://')) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `✅ *URL:*\n${res.data}` 
-                });
+                await ctx.reply(`✅ *URL:*\n${res.data}`);
             } else {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal mengupload ke Catbox!' 
-                });
+                await ctx.reply('❌ Gagal mengupload ke Catbox!');
             }
 
         } catch (error) {
             console.error('ToUrl error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mengupload media!' 
-            });
+            await ctx.reply('❌ Terjadi kesalahan saat mengupload media!');
         }
     }
 }

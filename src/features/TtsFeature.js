@@ -13,7 +13,7 @@ class TtsFeature extends BaseFeature {
         super('tts', 'Convert text to speech voice note', false, 'media');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             let lang = 'id'; // Default bahasa Indonesia
             let text = args.join(' ');
@@ -26,7 +26,7 @@ class TtsFeature extends BaseFeature {
             }
 
             // Jika reply pesan
-            const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            const quoted = (await ctx.replied().catch(()=>null))?.quotedMessage;
             if (quoted) {
                 const quotedText = quoted.conversation || 
                                   quoted.extendedTextMessage?.text || 
@@ -39,7 +39,7 @@ class TtsFeature extends BaseFeature {
 
             // Validasi
             if (!text || text.trim() === '') {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Format salah!\n\nCara pakai:\n> `.tts <text>` - Ubah text jadi voice note (Bahasa ID)\n> `.tts <lang> <text>` - Dengan bahasa tertentu\n> Reply pesan dengan `.tts` - Ubah pesan yang di-reply\n\nBahasa tersedia:\n> `id` 🇮🇩 Indonesia\n> `en` 🇬🇧 English\n> `ja` 🇯🇵 Japanese\n> `ko` 🇰🇷 Korean\n> `ar` 🇸🇦 Arabic\n\nContoh:\n> `.tts Halo selamat pagi`\n> `.tts en Good morning`\n> Reply pesan lalu ketik `.tts`' 
                 });
                 return;
@@ -47,16 +47,14 @@ class TtsFeature extends BaseFeature {
 
             // Batasi panjang text
             if (text.length > 1000) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Text terlalu panjang! Maksimal 1000 karakter.' 
                 });
                 return;
             }
 
             // React loading
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '🔊', key: m.key }
-            });
+            await ctx.react('🔊');
 
             // Generate TTS menggunakan API
             const mp3Buffer = await this.generateTTS(text, lang);
@@ -65,12 +63,10 @@ class TtsFeature extends BaseFeature {
             const audioBuffer = await this.convertToOpus(mp3Buffer);
 
             // Hapus react loading
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
             // Kirim sebagai voice note (PTT - Push To Talk)
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 audio: audioBuffer,
                 mimetype: 'audio/ogg; codecs=opus',
                 ptt: true // Ini yang membuat jadi voice note
@@ -78,7 +74,7 @@ class TtsFeature extends BaseFeature {
 
         } catch (error) {
             console.error('TTS error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: `❌ Gagal membuat voice note!\n\nError: ${error.message}` 
             });
         }
@@ -166,4 +162,5 @@ class TtsFeature extends BaseFeature {
 }
 
 module.exports = TtsFeature;
+
 

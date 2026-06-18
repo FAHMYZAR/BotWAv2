@@ -6,30 +6,24 @@ class BatalSholatFeature extends BaseFeature {
         super('batalsholat', 'Batal reminder sholat personal', false);
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            if (m.key.remoteJid.endsWith('@g.us')) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: '❌ Fitur ini hanya untuk chat pribadi!'
-                });
+            if (ctx.roomId.endsWith('@g.us')) {
+                await ctx.reply('❌ Fitur ini hanya untuk chat pribadi!');
                 return;
             }
 
-            await PersonalSholatSystem.unregister(m.key.remoteJid);
+            await PersonalSholatSystem.unregister(ctx.senderId);
             
             if (global.sholatScheduler) {
                 global.sholatScheduler.rebuild();
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                text: '✅ Reminder sholat berhasil dibatalkan.\n\nKetik *.daftarsholat <kota>* untuk daftar lagi.'
-            });
+            await ctx.reply('✅ Reminder sholat berhasil dibatalkan.\n\nKetik *.daftarsholat <kota>* untuk daftar lagi.');
 
         } catch (error) {
             console.error('[BATAL SHOLAT ERROR]:', error);
-            await sock.sendMessage(m.key.remoteJid, {
-                text: '❌ Terjadi kesalahan!'
-            });
+            await ctx.reply('❌ Terjadi kesalahan!');
         }
     }
 }

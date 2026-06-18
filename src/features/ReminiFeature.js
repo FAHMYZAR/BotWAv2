@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
@@ -15,9 +14,7 @@ class ReminiFeature extends BaseFeature {
 
     async uploadToCatbox(buffer) {
         const tempDir = path.join(__dirname, '../../temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         const tempPath = path.join(tempDir, `remini_${Date.now()}.jpg`);
         fs.writeFileSync(tempPath, buffer);
@@ -32,15 +29,10 @@ class ReminiFeature extends BaseFeature {
                 timeout: 30000
             });
 
-            if (!data || typeof data !== 'string' || !data.startsWith('https://')) {
-                throw new Error('Invalid response from Catbox');
-            }
-
+            if (!data || typeof data !== 'string' || !data.startsWith('https://')) throw new Error('Invalid response from Catbox');
             return data;
         } finally {
-            if (fs.existsSync(tempPath)) {
-                fs.unlinkSync(tempPath);
-            }
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         }
     }
 
@@ -52,52 +44,30 @@ class ReminiFeature extends BaseFeature {
             }
         });
         
-        if (!data.success || !data.data) {
-            throw new Error('API remini gagal');
-        }
-        
+        if (!data.success || !data.data) throw new Error('API remini gagal');
         return data.data;
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            if (this.processing.has(m.key.remoteJid)) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!' 
-                });
+            if (this.processing.has(ctx.roomId)) {
+                await ctx.reply('⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!');
                 return;
             }
 
-            const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = m.message.imageMessage || quoted?.imageMessage;
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
-            if (!imageMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Reply atau kirim gambar dengan caption `.remini`' 
-                });
+            if (!buffer || media?.type !== 'image') {
+                await ctx.reply('❌ Reply atau kirim gambar dengan caption `.remini`');
                 return;
             }
 
-            this.processing.add(m.key.remoteJid);
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '⏳', key: m.key }
-            });
-
-            const buffer = await downloadMediaMessage(
-                { message: { imageMessage } },
-                'buffer',
-                {},
-                { logger: console, reuploadRequest: sock.updateMediaMessage }
-            );
+            this.processing.add(ctx.roomId);
 
             if (buffer.length > this.maxSize) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gambar terlalu besar! Maksimal 10MB' 
-                });
+                await ctx.reply('❌ Gambar terlalu besar! Maksimal 10MB');
                 return;
             }
 
@@ -106,40 +76,22 @@ class ReminiFeature extends BaseFeature {
                 imageUrl = await this.uploadToCatbox(buffer);
             } catch (uploadError) {
                 console.error('Catbox upload failed:', uploadError.message);
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal upload gambar! Coba lagi nanti' 
-                });
+                await ctx.reply('❌ Gagal upload gambar! Coba lagi nanti');
                 return;
             }
 
             const enhancedUrl = await this.reminiImage(imageUrl);
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
-            await sock.sendMessage(m.key.remoteJid, {
-                image: { url: enhancedUrl },
-                caption: '✅ Gambar berhasil di-enhance!\n\n✨ Enhanced by Remini AI'
-            });
+            await client.send(ctx.roomId).image({ url: enhancedUrl }, { caption: '✅ Gambar berhasil di-enhance!\n\n✨ Enhanced by Remini AI' });
 
         } catch (error) {
             console.error('Remini error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
             
             let errorMsg = '❌ Gagal enhance gambar!';
-            if (error.message.includes('API remini gagal')) {
-                errorMsg = '❌ API Remini sedang bermasalah! Coba lagi nanti';
-            }
+            if (error.message.includes('API remini gagal')) errorMsg = '❌ API Remini sedang bermasalah! Coba lagi nanti';
             
-            await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
+            await ctx.reply(errorMsg);
         } finally {
-            this.processing.delete(m.key.remoteJid);
+            this.processing.delete(ctx.roomId);
         }
     }
 }

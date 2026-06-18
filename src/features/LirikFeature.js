@@ -7,18 +7,16 @@ class LirikFeature extends BaseFeature {
         super('lirik', 'Cari lirik lagu', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const judul = args.join(' ');
 
             if (!judul) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Masukkan judul lagu!\n\nContoh: .lirik faded' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Masukkan judul lagu!\n\nContoh: .lirik faded');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '🎵', key: m.key } });
+            await ctx.react('🎵');
 
             const response = await axios.get(`${config.apis.resita}/search/lirik`, {
                 params: { judul, apikey: config.resitaApiKey },
@@ -36,22 +34,14 @@ class LirikFeature extends BaseFeature {
             message += `*📝 JUDUL*\n> \`${data.judul}\`\n\n`;
             message += `*📜 LIRIK*\n${data.lirik}`;
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: message 
-            });
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('Lirik error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Lirik tidak ditemukan! Coba judul lagu yang lain.' 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Lirik tidak ditemukan! Coba judul lagu yang lain.');
         }
     }
 }

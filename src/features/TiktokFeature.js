@@ -9,24 +9,24 @@ class TiktokFeature extends BaseFeature {
         super('tt', 'Download video TikTok HD tanpa watermark', false, 'download');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const url = args[0];
 
             if (!url || !url.includes('tiktok.com')) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Berikan URL TikTok yang valid!\n\nContoh: .tt https://vt.tiktok.com/xxxxx' 
                 });
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const result = await Downloader(url, { version: 'v3' });
             console.log('TikTok result:', JSON.stringify(result, null, 2));
 
             if (!result.status || !result.result) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Gagal download! URL tidak valid atau video private.' 
                 });
                 return;
@@ -36,7 +36,7 @@ class TiktokFeature extends BaseFeature {
             const videoUrl = data.videoHD || data.videoSD;
             
             if (!videoUrl) {
-                await sock.sendMessage(m.key.remoteJid, { text: '❌ Video tidak ditemukan!' });
+                await client.sendMessage(ctx.remoteJid, { text: '❌ Video tidak ditemukan!' });
                 return;
             }
 
@@ -50,18 +50,16 @@ class TiktokFeature extends BaseFeature {
                 `> \`${desc}\`\n\n` +
                 `_🔥 No Watermark HD Quality_`;
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 video: Buffer.from(videoBuffer.data),
                 caption: caption
             });
 
         } catch (error) {
             console.error('TikTok download error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Terjadi kesalahan saat download! Coba lagi nanti.' 
             });
         }
@@ -69,3 +67,4 @@ class TiktokFeature extends BaseFeature {
 }
 
 module.exports = TiktokFeature;
+

@@ -2,11 +2,11 @@ const axios = require('axios');
 const config = require('../config/config');
 const GroupSystem = require('./GroupSystem');
 const PersonalSholatSystem = require('./PersonalSholatSystem');
-const { generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
+const { proto, generateWAMessageFromContent } = require('baileys');
 
 class SholatScheduler {
-    constructor(sock) {
-        this.sock = sock;
+    constructor(client) {
+        this.client = client;
         this.isConnected = false;
         this.retryQueue = new Map();
         this.currentJadwal = new Map();
@@ -26,15 +26,14 @@ class SholatScheduler {
 
     start() {
         console.log('[SCHEDULER] Starting event-driven prayer scheduler...');
-        this.sock.ev.on('connection.update', (update) => {
-            if (update.connection === 'open') {
-                this.isConnected = true;
-                console.log('[SCHEDULER] Connection restored, processing retry queue...');
-                this.processRetryQueue();
-            } else if (update.connection === 'close') {
-                this.isConnected = false;
-                console.log('[SCHEDULER] Connection lost');
-            }
+        this.client.on('connect', () => {
+            this.isConnected = true;
+            console.log('[SCHEDULER] Connection restored, processing retry queue...');
+            this.processRetryQueue();
+        });
+        this.client.on('disconnect', () => {
+            this.isConnected = false;
+            console.log('[SCHEDULER] Connection lost');
         });
         this.isConnected = true;
         this.scheduleAllReminders();
@@ -148,12 +147,65 @@ class SholatScheduler {
         }
     }
 
+    async sendLocationInteractive(jid, msg, footerText, kota, sourceUrl, lat, lng, mapsUrl) {
+        if (!this.client.socket?.relayMessage) return false;
+
+        const interactiveMessage = proto.Message.InteractiveMessage.create({
+            body: proto.Message.InteractiveMessage.Body.create({ text: `${msg}\n` }),
+            footer: proto.Message.InteractiveMessage.Footer.create({ text: footerText }),
+            header: proto.Message.InteractiveMessage.Header.create({
+                title: `Jadwal Sholat ${kota.toUpperCase()}`,
+                hasMediaAttachment: true,
+                locationMessage: proto.Message.LocationMessage.create({
+                    degreesLatitude: Number(lat),
+                    degreesLongitude: Number(lng),
+                    name: kota.toUpperCase(),
+                    address: 'Area dan sekitarnya',
+                    url: mapsUrl || undefined
+                })
+            }),
+            nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
+                buttons: [
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: 'Source Jadwal',
+                            url: sourceUrl
+                        })
+                    },
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: 'Buka Maps',
+                            url: mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`
+                        })
+                    }
+                ]
+            })
+        });
+
+        const message = generateWAMessageFromContent(jid, {
+            viewOnceMessage: {
+                message: {
+                    messageContextInfo: {
+                        deviceListMetadata: {},
+                        deviceListMetadataVersion: 2
+                    },
+                    interactiveMessage
+                }
+            }
+        }, { userJid: this.client.user?.id });
+
+        await this.client.socket.relayMessage(jid, message.message, { messageId: message.key.id });
+        return true;
+    }
+
     async sendGroupReminder(groupData, nama, waktu, kota, subuhTime) {
         const jid = groupData.groupId;
         try {
             if (nama === 'Subuh' && this.imsakMessageCache.has(jid)) {
                 const key = this.imsakMessageCache.get(jid);
-                try { await this.sock.sendMessage(jid, { delete: key }); } catch { }
+                try { if (key) await this.client.delete(key, { forEveryone: true }); } catch { }
                 this.imsakMessageCache.delete(jid);
             }
             const isFriday = new Date().getDay() === 5;
@@ -168,69 +220,27 @@ class SholatScheduler {
             const footerText = `Sumber: Kompas x EL-Ruwet\nTanggal: ${new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} WIB`;
 
             if (groupData.lat && groupData.lng) {
-                const interactiveMessagePayload = {
-                    body: proto.Message.InteractiveMessage.Body.create({
-                        text: `${msg}\n`
-                    }),
-                    footer: proto.Message.InteractiveMessage.Footer.create({
-                        text: footerText
-                    }),
-                    header: proto.Message.InteractiveMessage.Header.create({
-                        title: '',
-                        hasMediaAttachment: true,
-                        locationMessage: proto.Message.LocationMessage.create({
-                            degreesLatitude: Number(groupData.lat),
-                            degreesLongitude: Number(groupData.lng),
-                            name: kota.toUpperCase(),
-                            address: 'Area dan sekitarnya',
-                            url: groupData.mapsUrl || undefined
-                        })
-                    }),
-                    nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                        buttons: [
-                            {
-                                name: 'cta_url',
-                                buttonParamsJson: JSON.stringify({
-                                    display_text: 'Source Jadwal',
-                                    url: sourceUrl
-                                })
-                            }
-                        ]
-                    })
-                };
-
-                const msgNode = generateWAMessageFromContent(jid, {
-                    viewOnceMessage: {
-                        message: {
-                            messageContextInfo: {
-                                deviceListMetadata: {},
-                                deviceListMetadataVersion: 2
-                            },
-                            interactiveMessage: proto.Message.InteractiveMessage.create(interactiveMessagePayload)
-                        }
-                    }
-                }, { userJid: this.sock.user.id });
-
-                await this.sock.relayMessage(jid, msgNode.message, {
-                    messageId: msgNode.key.id
-                });
+                const mapsUrl = groupData.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${groupData.lat},${groupData.lng}`)}`;
+                const sent = await this.sendLocationInteractive(jid, msg, footerText, kota, sourceUrl, groupData.lat, groupData.lng, mapsUrl);
+                if (!sent) {
+                    await this.client.send(jid).buttons([
+                        { type: 'url', text: 'Source Jadwal', url: sourceUrl },
+                        { type: 'url', text: 'Buka Maps', url: mapsUrl }
+                    ], {
+                        image: this.getRandomBanner(),
+                        title: `Jadwal Sholat ${kota.toUpperCase()}`,
+                        text: `${msg}\n`,
+                        footer: footerText
+                    });
+                }
             } else {
-                await this.sock.sendMessage(jid, {
-                    interactiveMessage: {
-                        title: `${msg}\n`,
-                        footer: footerText,
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: 'cta_url',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: 'Source Jadwal',
-                                        url: sourceUrl
-                                    })
-                                }
-                            ]
-                        }
-                    }
+                await this.client.send(jid).buttons([
+                    { type: 'url', text: 'Source Jadwal', url: sourceUrl }
+                ], {
+                    image: this.getRandomBanner(),
+                    title: `Jadwal Sholat ${kota.toUpperCase()}`,
+                    text: `${msg}\n`,
+                    footer: footerText
                 });
             }
 
@@ -243,14 +253,11 @@ class SholatScheduler {
 
     async sendPersonalReminder(userId, nama, waktu, kota) {
         try {
-            for (let i = 0; i < 3; i++) {
-                await this.sock.sendMessage(userId, { text: '🕌 *AYO SHOLAT*' });
-                await new Promise(r => setTimeout(r, 1000));
-            }
+            await this.client.send(userId).text('🕌 *AYO SHOLAT*');
             const isFriday = new Date().getDay() === 5;
             let msg = `*Hai 👋*\n*Sekedar Mengingatkan Waktu Sholat ${nama.toUpperCase()}*\n\n\`Jam :\` *${waktu}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Semoga Allah memberikan kemudahan dalam ibadah kita_ 🤲`;
             if (nama === 'Dzuhur' && isFriday) msg = `*Hai 👋*\n*Sekedar Mengingatkan Sholat Jumat*\n*Ayo Jumatan! 🕌*\n\n\`Jam :\` *${waktu}*\n\`Kota :\` *${kota.toUpperCase()}*\n\n> _Jangan lupa sholat Jumat ya_ 🤲`;
-            await this.sock.sendMessage(userId, { text: msg });
+            await this.client.send(userId).text(msg);
             console.log(`[SCHEDULER] Personal ${nama} reminder sent to ${userId}`);
         } catch (e) {
             console.error(`[SCHEDULER] sendPersonalReminder error:`, e.message);

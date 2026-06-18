@@ -7,27 +7,21 @@ class CandaFeature extends BaseFeature {
         super('canda', 'Dapatkan jokes receh random', false, 'fun');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const type = args[0]?.toLowerCase();
 
             if (type === 'image' || type === 'img') {
                 const { data } = await axios.get(`${config.apis.candaan}/image/random`);
-                await sock.sendMessage(m.key.remoteJid, {
-                    image: { url: data.data.url }
-                });
+                await client.send(ctx.remoteJid).image({ url: data.data.url });
             } else {
                 const { data } = await axios.get(`${config.apis.candaan}/text/random`);
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: data.data
-                });
+                await client.send(ctx.remoteJid).text(data.data);
             }
 
         } catch (error) {
             console.error('Canda error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                text: '❌ Gagal mengambil candaan! Coba lagi nanti'
-            });
+            await client.send(ctx.remoteJid).text('❌ Gagal mengambil candaan! Coba lagi nanti');
         }
     }
 }

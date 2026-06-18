@@ -7,18 +7,16 @@ class FacebookFeature extends BaseFeature {
         super('fb', 'Download video Facebook', false, 'download');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const url = args[0];
 
             if (!url || !url.includes('facebook.com')) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Berikan URL Facebook yang valid!\n\nContoh: .fb https://www.facebook.com/share/r/xxxxx' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Berikan URL Facebook yang valid!\n\nContoh: .fb https://www.facebook.com/share/r/xxxxx');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const response = await axios.get(`${config.apis.lolhuman}/facebook`, {
                 params: { apikey: config.lolhumanApiKey, url },
@@ -69,25 +67,16 @@ class FacebookFeature extends BaseFeature {
                 `> \`${sizeInMB} MB\`\n\n` +
                 `_No Watermark_`;
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
-            await sock.sendMessage(m.key.remoteJid, {
-                video: videoBuffer,
-                caption: caption,
+            await client.send(ctx.remoteJid).video(videoBuffer, { caption: caption,
                 gifPlayback: false,
-                jpegThumbnail: null
-            });
+                jpegThumbnail: null });
 
         } catch (error) {
             console.error('Facebook error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat download! Video mungkin terlalu besar, private, atau tidak tersedia.' 
-            });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat download! Video mungkin terlalu besar, private, atau tidak tersedia.');
         }
     }
 }

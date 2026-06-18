@@ -8,17 +8,15 @@ class BratVidFeature extends BaseFeature {
         super('bratvid', 'Membuat stiker brat video', false, 'media');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             if (!args.length) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Masukkan teks untuk Brat Video!\n\nContoh: .bratvid hello world' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Masukkan teks untuk Brat Video!\n\nContoh: .bratvid hello world');
                 return;
             }
 
             const text = args.join(' ');
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             // Generate frames
             const frames = await bratVidGenerator(text, 512, 512, '#FFFFFF', '#000000', []);
@@ -38,14 +36,9 @@ class BratVidFeature extends BaseFeature {
             // Send sticker with proper metadata
             const stickerBuffer = await fs.readFile(outputPath);
             
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
             
-            await sock.sendMessage(m.key.remoteJid, { 
-                sticker: stickerBuffer,
-                mimetype: 'image/webp'
-            });
+            await client.send(ctx.remoteJid).sticker(stickerBuffer);
 
             // Cleanup
             await fs.rm(tempDir, { recursive: true });
@@ -53,9 +46,7 @@ class BratVidFeature extends BaseFeature {
 
         } catch (error) {
             console.error('BratVid error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Gagal membuat Brat Video. Coba lagi nanti.' 
-            });
+            await client.send(ctx.remoteJid).text('❌ Gagal membuat Brat Video. Coba lagi nanti.');
         }
     }
 }

@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const { createCanvas, loadImage } = require('canvas');
 const sharp = require('sharp');
 
@@ -8,54 +7,32 @@ class SmemeFeature extends BaseFeature {
         super('smeme', 'Buat meme dari gambar/sticker (reply gambar + teks)', false, 'media');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+            const quoted = await ctx.replied().catch(() => null);
+            const media = quoted?.media;
             
-            if (!quoted || (!quoted.imageMessage && !quoted.stickerMessage)) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Reply gambar/sticker dengan teks!\n\nContoh: .smeme teks atas|teks bawah' 
-                });
+            if (!media || (media.type !== 'image' && media.type !== 'sticker')) {
+                await ctx.reply('❌ Reply gambar/sticker dengan teks!\n\nContoh: .smeme teks atas|teks bawah');
                 return;
             }
 
             if (!args.length) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Masukkan teks!\n\nContoh: .smeme teks atas|teks bawah\nAtau: .smeme teks atas' 
-                });
+                await ctx.reply('❌ Masukkan teks!\n\nContoh: .smeme teks atas|teks bawah\nAtau: .smeme teks atas');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
-
-            // Download media
-            let buffer;
-            if (quoted.imageMessage) {
-                buffer = await downloadMediaMessage(
-                    { message: { imageMessage: quoted.imageMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-            } else if (quoted.stickerMessage) {
-                const stickerBuffer = await downloadMediaMessage(
-                    { message: { stickerMessage: quoted.stickerMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-                // Convert WebP sticker to PNG
-                buffer = await sharp(stickerBuffer).png().toBuffer();
+            let buffer = await media.buffer();
+            
+            if (media.type === 'sticker') {
+                buffer = await sharp(buffer).png().toBuffer();
             }
 
-            // Parse text
             const text = args.join(' ');
             const [topText, bottomText] = text.includes('|') ? text.split('|') : [text, ''];
 
-            // Create meme
             const memeBuffer = await this.createMeme(buffer, topText.trim(), bottomText.trim());
 
-            // Convert to sticker
             const stickerBuffer = await sharp(memeBuffer)
                 .resize(512, 512, {
                     fit: 'contain',
@@ -64,53 +41,40 @@ class SmemeFeature extends BaseFeature {
                 .webp({ quality: 95 })
                 .toBuffer();
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
-            await sock.sendMessage(m.key.remoteJid, { sticker: stickerBuffer });
+            await client.send(ctx.roomId).sticker(stickerBuffer);
 
         } catch (error) {
             console.error('Smeme error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Gagal membuat meme!' 
-            });
+            await ctx.reply('❌ Gagal membuat meme!');
         }
     }
 
     async createMeme(imageBuffer, topText, bottomText) {
-        // Load image
         const image = await loadImage(imageBuffer);
-        
-        // Create canvas with image dimensions
         const canvas = createCanvas(image.width, image.height);
-        const ctx = canvas.getContext('2d');
+        const ctxCanvas = canvas.getContext('2d');
 
-        // Draw image
-        ctx.drawImage(image, 0, 0);
+        ctxCanvas.drawImage(image, 0, 0);
 
-        // Setup text style (Impact font style)
         const fontSize = Math.floor(image.width / 10);
-        ctx.font = `900 ${fontSize}px Impact, sans-serif`; // 900 = extra bold
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
+        ctxCanvas.font = `900 ${fontSize}px Impact, sans-serif`;
+        ctxCanvas.textAlign = 'center';
+        ctxCanvas.textBaseline = 'top';
 
-        // Draw top text
         if (topText) {
-            const lines = this.wrapText(ctx, topText.toUpperCase(), image.width - 20);
+            const lines = this.wrapText(ctxCanvas, topText.toUpperCase(), image.width - 20);
             let y = 20;
             lines.forEach(line => {
-                this.drawTextWithStroke(ctx, line, image.width / 2, y, fontSize);
+                this.drawTextWithStroke(ctxCanvas, line, image.width / 2, y, fontSize);
                 y += fontSize;
             });
         }
 
-        // Draw bottom text
         if (bottomText) {
-            const lines = this.wrapText(ctx, bottomText.toUpperCase(), image.width - 20);
+            const lines = this.wrapText(ctxCanvas, bottomText.toUpperCase(), image.width - 20);
             let y = image.height - (lines.length * fontSize) - 20;
             lines.forEach(line => {
-                this.drawTextWithStroke(ctx, line, image.width / 2, y, fontSize);
+                this.drawTextWithStroke(ctxCanvas, line, image.width / 2, y, fontSize);
                 y += fontSize;
             });
         }
@@ -119,21 +83,17 @@ class SmemeFeature extends BaseFeature {
     }
 
     drawTextWithStroke(ctx, text, x, y, fontSize) {
-        // Stroke lebih tebal dengan multiple layer
-        const strokeWidth = Math.floor(fontSize / 8); // Lebih tebal dari /20
+        const strokeWidth = Math.floor(fontSize / 8);
         
-        // Layer 1: Stroke hitam tebal
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = strokeWidth * 2;
         ctx.lineJoin = 'round';
         ctx.miterLimit = 2;
         ctx.strokeText(text, x, y);
         
-        // Layer 2: Stroke hitam medium (untuk smooth edge)
         ctx.lineWidth = strokeWidth * 1.5;
         ctx.strokeText(text, x, y);
         
-        // Layer 3: Fill putih
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(text, x, y);
     }

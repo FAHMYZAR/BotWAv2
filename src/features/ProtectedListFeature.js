@@ -6,7 +6,7 @@ class ProtectedListFeature extends BaseFeature {
         super('protectedlist', 'Lihat daftar protected users', true, 'owner');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const data = ProtectionSystem.getAll();
             
@@ -32,11 +32,11 @@ class ProtectedListFeature extends BaseFeature {
             
             message += `\n*Total:* ${data.numbers.length + data.jids.length} protected users`;
 
-            await sock.sendMessage(m.key.remoteJid, { text: message });
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('ProtectedList error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal mengambil protected list!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal mengambil protected list!');
         }
     }
 }

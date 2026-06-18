@@ -1,6 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const axios = require('axios');
-const config = require('../config/config');
 
 class TranslateFeature extends BaseFeature {
     constructor() {
@@ -9,89 +7,48 @@ class TranslateFeature extends BaseFeature {
 
     getFlag(langCode) {
         const flags = {
-            'id': '🇮🇩',
-            'en': '🇬🇧',
-            'ja': '🇯🇵',
-            'ko': '🇰🇷',
-            'ar': '🇸🇦',
-            'zh': '🇨🇳',
-            'es': '🇪🇸',
-            'fr': '🇫🇷',
-            'de': '🇩🇪',
-            'ru': '🇷🇺',
-            'pt': '🇵🇹',
-            'it': '🇮🇹',
-            'th': '🇹🇭',
-            'vi': '🇻🇳',
-            'nl': '🇳🇱',
-            'tr': '🇹🇷',
-            'hi': '🇮🇳'
+            id: '🇮🇩', en: '🇬🇧', ja: '🇯🇵', ko: '🇰🇷', ar: '🇸🇦', zh: '🇨🇳',
+            es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪', ru: '🇷🇺', pt: '🇵🇹', it: '🇮🇹',
+            th: '🇹🇭', vi: '🇻🇳', nl: '🇳🇱', tr: '🇹🇷', hi: '🇮🇳'
         };
         return flags[langCode] || '🌐';
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             let targetLang = args[0];
             let text = args.slice(1).join(' ');
+            const jid = ctx.roomId || ctx.remoteJid || ctx.senderId;
 
-            // Jika reply pesan
-            const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (quoted) {
-                const quotedText = quoted.conversation || 
-                                  quoted.extendedTextMessage?.text || 
-                                  quoted.imageMessage?.caption || 
-                                  quoted.videoMessage?.caption;
-                if (quotedText) {
-                    text = quotedText;
-                }
-            }
+            const quoted = await ctx.replied?.().catch(() => null);
+            if (quoted?.text && !text) text = quoted.text;
 
             if (!targetLang || !text) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Format salah!\n\nContoh:\n> `/tr id Good morning`\n> Reply pesan: `/tr id`\n\nKode bahasa:\n> `id` - Indonesia\n> `en` - English\n> `ja` - Japanese\n> `ko` - Korean\n> `ar` - Arabic' 
-                });
+                await client.send(jid).text('❌ Format salah!\n\nContoh:\n> `/tr id Good morning`\n> Reply pesan: `/tr id`\n\nKode bahasa:\n> `id` - Indonesia\n> `en` - English\n> `ja` - Japanese\n> `ko` - Korean\n> `ar` - Arabic');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '🔄', key: m.key }
-            });
-
+            await ctx.react('🔄');
+            const axios = require('axios');
+            const config = require('../config/config');
             const response = await axios.get(`${config.apis.lolhuman}/translate/auto/${targetLang}`, {
-                params: { 
-                    apikey: config.lolhumanApiKey,
-                    text: text
-                },
+                params: { apikey: config.lolhumanApiKey, text },
                 timeout: 10000
             });
 
             if (response.data.status !== 200 || !response.data.result) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal menerjemahkan!' 
-                });
+                await ctx.react('');
+                await client.send(jid).text('❌ Gagal menerjemahkan!');
                 return;
             }
 
             const data = response.data.result;
-            const flag = this.getFlag(data.to);
-            
-            let message = `${flag}\n`;
-            message += `\`${data.translated}\`\n`;
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { text: message });
-
+            await ctx.react('');
+            await client.send(jid).text(`${this.getFlag(data.to)}\n\`${data.translated}\``);
         } catch (error) {
             console.error('Translate error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat menerjemahkan!' 
-            });
+            const jid = ctx.roomId || ctx.remoteJid || ctx.senderId;
+            await client.send(jid).text('❌ Terjadi kesalahan saat menerjemahkan!');
         }
     }
 }

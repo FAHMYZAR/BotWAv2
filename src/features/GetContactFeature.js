@@ -7,31 +7,27 @@ class GetContactFeature extends BaseFeature {
         super('getcontact', 'Cek info nomor telepon', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             let phoneNumber = args[0];
 
-            if (m.message?.extendedTextMessage?.contextInfo?.participant) {
-                phoneNumber = m.message.extendedTextMessage.contextInfo.participant.split('@')[0];
-            } else if (m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]) {
-                phoneNumber = m.message.extendedTextMessage.contextInfo.mentionedJid[0].split('@')[0];
+            if ((await ctx.replied().catch(()=>null))?.senderJid) {
+                phoneNumber = (await ctx.replied().catch(()=>null))?.senderJid.split('@')[0];
+            } else if (ctx.mentions?.[0]) {
+                phoneNumber = ctx.mentions[0].split('@')[0];
             }
 
             if (!phoneNumber) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Berikan nomor telepon!\n\nContoh:\n> `.getcontact 628123456789`\n> Reply pesan seseorang\n> Tag seseorang' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Berikan nomor telepon!\n\nContoh:\n> `.getcontact 628123456789`\n> Reply pesan seseorang\n> Tag seseorang');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { text: '🔍 Mencari info nomor...' });
+            await client.send(ctx.remoteJid).text('🔍 Mencari info nomor...');
 
-            const results = await PhoneLookup.lookup(sock, phoneNumber);
+            const results = await PhoneLookup.lookup(client, phoneNumber);
 
             if (!results.sources || results.sources.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Tidak dapat menemukan info untuk nomor ini!' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Tidak dapat menemukan info untuk nomor ini!');
                 return;
             }
 
@@ -67,22 +63,18 @@ class GetContactFeature extends BaseFeature {
             if (whatsapp?.profilePicUrl) {
                 try {
                     const picResponse = await axios.get(whatsapp.profilePicUrl, { responseType: 'arraybuffer' });
-                    await sock.sendMessage(m.key.remoteJid, {
-                        image: Buffer.from(picResponse.data),
-                        caption: message
-                    });
+                    await client.send(ctx.remoteJid).image(Buffer.from(picResponse.data), { caption: message
+                     });
                 } catch {
-                    await sock.sendMessage(m.key.remoteJid, { text: message });
+                    await client.send(ctx.remoteJid).text(message);
                 }
             } else {
-                await sock.sendMessage(m.key.remoteJid, { text: message });
+                await client.send(ctx.remoteJid).text(message);
             }
 
         } catch (error) {
             console.error('GetContact error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mencari info nomor!' 
-            });
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat mencari info nomor!');
         }
     }
 }

@@ -6,13 +6,18 @@ class BaseFeature {
         this.category = category;
     }
 
-    async execute(message, chat, args) {
+    async execute(ctx, client, args) {
         throw new Error('Execute method must be implemented');
     }
 
-    async handleError(chat, error) {
+    async handleError(client, ctx, error) {
         console.error(`[${this.name}] Error:`, error);
-        await chat.sendMessage(`❌ Terjadi kesalahan pada fitur ${this.name}!`);
+        if (typeof ctx.reply === 'function') {
+            await ctx.reply(`❌ Terjadi kesalahan pada fitur ${this.name}!`);
+        } else {
+            const jid = ctx.remoteJid || ctx.roomId || ctx.chatId;
+            if (jid) await client.send(jid).text(`❌ Terjadi kesalahan pada fitur ${this.name}!`);
+        }
     }
 }
 

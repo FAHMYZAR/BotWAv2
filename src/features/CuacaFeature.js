@@ -68,18 +68,16 @@ class CuacaFeature extends BaseFeature {
         }).format(new Date());
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const lokasi = args.join(' ');
 
             if (!lokasi) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: '❌ Masukkan nama lokasi!\n\n*Contoh:*\n> `.cuaca Jakarta`\n> `.cuaca New York`\n> `.cuaca Tokyo`\n> `.cuaca Paris, France`\n\n✨ Bisa cek cuaca di seluruh dunia!'
-                });
+                await client.send(ctx.remoteJid).text('❌ Masukkan nama lokasi!\n\n*Contoh:*\n> `.cuaca Jakarta`\n> `.cuaca New York`\n> `.cuaca Tokyo`\n> `.cuaca Paris, France`\n\n✨ Bisa cek cuaca di seluruh dunia!');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '🌤️', key: m.key } });
+            await ctx.react('🌤️');
 
             const currentDateTime = this.getCurrentDateTime();
             const systemInstruction = `Kamu adalah asisten cuaca yang memberikan informasi cuaca realtime.
@@ -124,8 +122,8 @@ _Update: ${currentDateTime} WIB_
             const searchResults = await client.search(`cuaca ${lokasi} ${currentDateTime}`, 5);
 
             if (!searchResults?.data?.length) {
-                await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
-                await sock.sendMessage(m.key.remoteJid, { text: '❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`' });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text('❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`');
                 return;
             }
 
@@ -134,19 +132,19 @@ _Update: ${currentDateTime} WIB_
                 { role: 'user', content: `SEARCH_RESULT:\n${JSON.stringify(searchResults.data, null, 2)}\n\nBerikan informasi cuaca TERKINI untuk lokasi: ${lokasi}` }
             ]);
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+            await ctx.react('');
 
             if (rawAnswer.includes('tidak ditemukan') || rawAnswer.includes('not found')) {
-                await sock.sendMessage(m.key.remoteJid, { text: '❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`' });
+                await client.send(ctx.remoteJid).text('❌ Lokasi tidak ditemukan!\n\nPastikan nama lokasi benar atau coba format lain:\n> `.cuaca [Kota], [Negara]`');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { text: rawAnswer });
+            await client.send(ctx.remoteJid).text(rawAnswer);
 
         } catch (error) {
             console.error('Cuaca error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan saat mengecek cuaca!\n\nCoba lagi dalam beberapa saat.' });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat mengecek cuaca!\n\nCoba lagi dalam beberapa saat.');
         }
     }
 }

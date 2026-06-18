@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -9,59 +8,25 @@ class ToImgFeature extends BaseFeature {
         super('toimg', 'Mengonversi stiker menjadi gambar', false, 'media');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const quoted = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-            const stickerMessage = m.message.stickerMessage || quoted?.stickerMessage;
-            const videoMessage = m.message.videoMessage || quoted?.videoMessage;
-
-            if (!stickerMessage && !videoMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '⚠️ Kirim/Reply sticker atau video dengan .toimg!' 
-                });
-                return;
-            }
-
-            // Handle video to gif
-            if (videoMessage) {
-                await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
-                
-                const buffer = await downloadMediaMessage(
-                    { message: { videoMessage } },
-                    'buffer',
-                    {},
-                    { logger: console, reuploadRequest: sock.updateMediaMessage }
-                );
-
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-
-                await sock.sendMessage(m.key.remoteJid, {
-                    video: buffer,
-                    gifPlayback: true,
-                    caption: '🎬 Video as GIF'
-                });
-                return;
-            }
-
-            const isAnimated = stickerMessage.isAnimated;
-
-            await sock.sendMessage(m.key.remoteJid, { text: '⏳ Mengonversi stiker...' });
-
-            const buffer = await downloadMediaMessage(
-                { message: { stickerMessage } },
-                'buffer',
-                {},
-                { logger: console, reuploadRequest: sock.updateMediaMessage }
-            );
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
             if (!buffer) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal mengunduh stiker!' 
-                });
+                await ctx.reply('⚠️ Kirim/Reply sticker atau video dengan .toimg!');
                 return;
             }
+
+            if (media.type === 'video') {
+                await client.send(ctx.roomId).video(buffer, { gifPlayback: true, caption: '🎬 Video as GIF' });
+                return;
+            }
+
+            const isAnimated = Boolean(media.isAnimated || quoted?.message?.stickerMessage?.isAnimated);
+
+            await ctx.reply('⏳ Mengonversi stiker...');
 
             const tempDir = path.join(__dirname, '../../temp');
             if (!fs.existsSync(tempDir)) {
@@ -79,25 +44,16 @@ class ToImgFeature extends BaseFeature {
                 fs.unlinkSync(webpPath);
 
                 if (err || !fs.existsSync(outputPath)) {
-                    await sock.sendMessage(m.key.remoteJid, { 
-                        text: `❌ Konversi gagal: ${err?.message || 'Tidak diketahui'}` 
-                    });
+                    await ctx.reply(`❌ Konversi gagal: ${err?.message || 'Tidak diketahui'}`);
                     return;
                 }
 
                 const mediaBuffer = fs.readFileSync(outputPath);
                 
                 if (isAnimated) {
-                    await sock.sendMessage(m.key.remoteJid, { 
-                        video: mediaBuffer,
-                        gifPlayback: true,
-                        caption: '🎉 Sticker animasi → GIF!' 
-                    });
+                    await client.send(ctx.roomId).video(mediaBuffer, { gifPlayback: true, caption: '🎉 Sticker animasi → GIF!' });
                 } else {
-                    await sock.sendMessage(m.key.remoteJid, { 
-                        image: mediaBuffer, 
-                        caption: '🎉 Sticker → Image!' 
-                    });
+                    await client.send(ctx.roomId).image(mediaBuffer, { caption: '🎉 Sticker → Image!' });
                 }
 
                 fs.unlinkSync(outputPath);
@@ -105,9 +61,7 @@ class ToImgFeature extends BaseFeature {
 
         } catch (error) {
             console.error('ToImg error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `❌ Gagal mengonversi: ${error.message}` 
-            });
+            await ctx.reply(`❌ Gagal mengonversi: ${error.message}`);
         }
     }
 }

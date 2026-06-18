@@ -23,19 +23,15 @@ class CekUjianFeature extends BaseFeature {
         return `${day} ${month} ${year}`;
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const data = await fetchJadwalKuliah();
 
             if (data.ujian?.isHtml) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `❌ *Login Gagal!*\n\n${data.ujian?.message}\n\nKemungkinan:\n• Session expired\n• Username/password salah\n• Server RAISING bermasalah` 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text(`❌ *Login Gagal!*\n\n${data.ujian?.message}\n\nKemungkinan:\n• Session expired\n• Username/password salah\n• Server RAISING bermasalah`);
                 return;
             }
 
@@ -46,12 +42,8 @@ class CekUjianFeature extends BaseFeature {
             if (args.length > 0) {
                 const dayNumber = this.getDayNumber(args[0]);
                 if (dayNumber === undefined) {
-                    await sock.sendMessage(m.key.remoteJid, {
-                        react: { text: '', key: m.key }
-                    });
-                    await sock.sendMessage(m.key.remoteJid, { 
-                        text: '❌ Nama hari tidak valid!\n\nContoh:\n> .cekujian senin\n> .cekujian jumat' 
-                    });
+                    await ctx.react('');
+                    await client.send(ctx.remoteJid).text('❌ Nama hari tidak valid!\n\nContoh:\n> .cekujian senin\n> .cekujian jumat');
                     return;
                 }
                 targetDay = dayNumber;
@@ -78,12 +70,8 @@ class CekUjianFeature extends BaseFeature {
             const formattedDate = this.formatDate(jadwalDate);
 
             if (ujianHariIni.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `📅 *JADWAL UJIAN ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n✅ Tidak ada jadwal ujian!` 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text(`📅 *JADWAL UJIAN ${targetDayName.toUpperCase()}, ${formattedDate}*\n\n✅ Tidak ada jadwal ujian!`);
                 return;
             }
 
@@ -98,16 +86,12 @@ class CekUjianFeature extends BaseFeature {
                 if (i < ujianHariIni.length - 1) message += `\n`;
             });
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { text: message });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('CekUjian error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `❌ Terjadi kesalahan saat mengambil jadwal ujian!\n\nError: ${error.message}` 
-            });
+            await client.send(ctx.remoteJid).text(`❌ Terjadi kesalahan saat mengambil jadwal ujian!\n\nError: ${error.message}`);
         }
     }
 }

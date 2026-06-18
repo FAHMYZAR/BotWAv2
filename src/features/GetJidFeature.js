@@ -6,15 +6,13 @@ class GetJidFeature extends BaseFeature {
         super('getjid', 'Ambil JID user (untuk @lid format)', false, 'owner');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
-            const targetJid = AdminHelper.extractJid(m);
+            const groupId = ctx.remoteJid;
+            const targetJid = await AdminHelper.extractJidFromCtx(ctx);
             
             if (!targetJid) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Tag atau reply pesan user untuk ambil JID!\n\nContoh:\n> `/getjid @user`\n> Reply pesan + `/getjid`' 
-                });
+                await client.send(groupId).text('❌ Tag atau reply pesan user untuk ambil JID!\n\nContoh:\n> `/getjid @user`\n> Reply pesan + `/getjid`');
                 return;
             }
 
@@ -32,14 +30,12 @@ class GetJidFeature extends BaseFeature {
             message += `*Format:* ${targetJid.includes('@lid') ? '@lid (Newsletter/Channel)' : '@s.whatsapp.net (Normal)'}\n\n`;
             message += `_Copy JID di atas untuk proteksi user_`;
 
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions: [targetJid]
-            });
+            await client.send(groupId).text(message).mentions([targetJid]
+            );
 
         } catch (error) {
             console.error('GetJid error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal mengambil JID!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal mengambil JID!');
         }
     }
 }

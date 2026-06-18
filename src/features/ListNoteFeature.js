@@ -6,15 +6,13 @@ class ListNoteFeature extends BaseFeature {
         super('listnote', 'Lihat daftar semua catatan', false, 'info');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const notes = await KeynoteSystem.getAllKeynotes();
             const prefix = await KeynoteSystem.getPrefix();
             
             if (notes.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '📝 *DAFTAR CATATAN*\n\n❌ Belum ada catatan tersimpan\n\n💡 Tambah catatan: !addkeynote [nama] [isi]'
-                });
+                await client.send(ctx.remoteJid).text('📝 *DAFTAR CATATAN*\n\n❌ Belum ada catatan tersimpan\n\n💡 Tambah catatan: !addkeynote [nama] [isi]');
                 return;
             }
 
@@ -28,13 +26,11 @@ class ListNoteFeature extends BaseFeature {
 
             message += `\n💡 Akses: Ketik ${prefix}[nama]`;
 
-            await sock.sendMessage(m.key.remoteJid, { text: message });
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('ListNote error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat mengambil daftar catatan!'
-            });
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat mengambil daftar catatan!');
         }
     }
 }

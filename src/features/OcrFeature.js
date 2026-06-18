@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
@@ -60,45 +59,26 @@ class OcrFeature extends BaseFeature {
         return data.text;
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            if (this.processing.has(m.key.remoteJid)) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!' 
-                });
+            if (this.processing.has(ctx.roomId)) {
+                await ctx.reply('⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!');
                 return;
             }
 
-            const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = m.message.imageMessage || quoted?.imageMessage;
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
-            if (!imageMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Reply atau kirim gambar dengan caption `.ocr`' 
-                });
+            if (!buffer || media?.type !== 'image') {
+                await ctx.reply('❌ Reply atau kirim gambar dengan caption `.ocr`');
                 return;
             }
 
-            this.processing.add(m.key.remoteJid);
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '📄', key: m.key }
-            });
-
-            const buffer = await downloadMediaMessage(
-                { message: { imageMessage } },
-                'buffer',
-                {},
-                { logger: console, reuploadRequest: sock.updateMediaMessage }
-            );
+            this.processing.add(ctx.roomId);
 
             if (buffer.length > this.maxSize) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gambar terlalu besar! Maksimal 10MB' 
-                });
+                await ctx.reply('❌ Gambar terlalu besar! Maksimal 10MB');
                 return;
             }
 
@@ -107,39 +87,25 @@ class OcrFeature extends BaseFeature {
                 imageUrl = await this.uploadToCatbox(buffer);
             } catch (uploadError) {
                 console.error('Catbox upload failed:', uploadError.message);
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal upload gambar! Coba lagi nanti' 
-                });
+                await ctx.reply('❌ Gagal upload gambar! Coba lagi nanti');
                 return;
             }
 
             const extractedText = await this.extractText(imageUrl);
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
-            await sock.sendMessage(m.key.remoteJid, {
-                text: `📄 *OCR Result*\n\n${extractedText}\n\n_✨ Extracted by EL-RUWET [BOT + AI]_`
-            });
+            await ctx.reply(`📄 *OCR Result*\n\n${extractedText}\n\n_✨ Extracted by EL-RUWET [BOT + AI]_`);
 
         } catch (error) {
             console.error('OCR error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
             
             let errorMsg = '❌ Gagal extract text dari gambar!';
             if (error.message.includes('API OCR gagal')) {
                 errorMsg = '❌ API OCR sedang bermasalah! Coba lagi nanti';
             }
             
-            await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
+            await ctx.reply(errorMsg);
         } finally {
-            this.processing.delete(m.key.remoteJid);
+            this.processing.delete(ctx.roomId);
         }
     }
 }

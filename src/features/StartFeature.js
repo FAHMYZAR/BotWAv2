@@ -7,7 +7,7 @@ class StartFeature extends BaseFeature {
         super('start', 'Pesan selamat datang', false, 'info');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const imagePath = path.join(__dirname, '../../disk/welcome.png');
             const imageBuffer = fs.readFileSync(imagePath);
@@ -18,7 +18,7 @@ class StartFeature extends BaseFeature {
                 `> Gunakan \`.help\` untuk melihat daftar perintah\n\n` +
                 `_🔥 EL-RUWET [BOT + AI] © ${new Date().getFullYear()}_`;
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 image: imageBuffer,
                 caption: caption
             });
@@ -30,8 +30,9 @@ class StartFeature extends BaseFeature {
 
     async handleError(m, sock, error) {
         console.error(`${this.name} error:`, error);
-        await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan!' });
+        await client.sendMessage(ctx.remoteJid, { text: '❌ Terjadi kesalahan!' });
     }
 }
 
 module.exports = StartFeature;
+

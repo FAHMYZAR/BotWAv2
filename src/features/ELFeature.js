@@ -1,6 +1,6 @@
 const BaseFeature = require('../core/BaseFeature');
 const config = require('../config/config');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+
 const sharp = require('sharp');
 
 function getCurrentJakartaDateTime() {
@@ -373,10 +373,10 @@ class ELFeature extends BaseFeature {
         return `[thinking ${this.formatElapsed(startMs)}] ${text}`;
     }
 
-    async sendStatus(sock, remoteJid, m, startMs, text) {
-        const msg = await sock.sendMessage(remoteJid, { text: this.formatStatus(startMs, text) }, { quoted: m });
+    async sendStatus(client, remoteJid, ctx, startMs, text) {
+        const msg = await client.sendMessage(remoteJid, { text: this.formatStatus(startMs, text) }, );
         const interval = setInterval(() => {
-            sock.sendMessage(remoteJid, {
+            client.sendMessage(remoteJid, {
                 text: this.formatStatus(startMs, this.statusTrackers.get(msg.key.id) || text),
                 edit: msg.key
             }).catch(() => {});
@@ -387,19 +387,19 @@ class ELFeature extends BaseFeature {
         return msg;
     }
 
-    async editStatus(sock, remoteJid, statusMessage, startMs, text) {
+    async editStatus(client, remoteJid, statusMessage, startMs, text) {
         if (!statusMessage?.key) {
-            return sock.sendMessage(remoteJid, { text: this.formatStatus(startMs, text) });
+            return client.sendMessage(remoteJid, { text: this.formatStatus(startMs, text) });
         }
 
         this.statusTrackers.set(statusMessage.key.id, text);
-        return sock.sendMessage(remoteJid, {
+        return client.sendMessage(remoteJid, {
             text: this.formatStatus(startMs, text),
             edit: statusMessage.key
         });
     }
 
-    async finishStatus(sock, remoteJid, statusMessage, output, m) {
+    async finishStatus(client, remoteJid, statusMessage, output, ctx) {
         if (statusMessage?.key) {
             const interval = this.statusTrackers.get(`${statusMessage.key.id}_interval`);
             if (interval) clearInterval(interval);
@@ -423,10 +423,10 @@ class ELFeature extends BaseFeature {
 
             // Hapus pesan status karena kita akan kirim interactive (gabisa di-edit)
             if (statusMessage?.key) {
-                try { await sock.sendMessage(remoteJid, { delete: statusMessage.key }); } catch {}
+                try { await client.delete(statusMessage.key); } catch {}
             }
 
-            return sock.sendMessage(remoteJid, {
+            return client.sendMessage(remoteJid, {
                 interactiveMessage: {
                     title: `${cleanOutput}\n`,
                     footer: footerText,
@@ -442,49 +442,50 @@ class ELFeature extends BaseFeature {
                         ]
                     }
                 }
-            }, { quoted: m });
+            }, );
         }
 
         if (!statusMessage?.key) {
-            return sock.sendMessage(remoteJid, { text: output }, { quoted: m });
+            return client.sendMessage(remoteJid, { text: output }, );
         }
 
-        return sock.sendMessage(remoteJid, {
-            text: output,
-            edit: statusMessage.key
-        });
+        return client.edit(statusMessage.key
+        ).text(output);
     }
 
-    getQuotedContextInfo(m) {
-        return m.message.extendedTextMessage?.contextInfo?.quotedMessage ? {
-            stanzaId: m.message.extendedTextMessage.contextInfo.stanzaId,
-            participant: m.message.extendedTextMessage.contextInfo.participant,
-            quotedMessage: m.message.extendedTextMessage.contextInfo.quotedMessage
-        } : undefined;
+    async getQuotedContextInfo(ctx) {
+        const replied = await ctx.replied?.().catch(() => null);
+        if (!replied?.message) return undefined;
+        return {
+            stanzaId: replied.uniqueId,
+            participant: replied.senderJid,
+            quotedMessage: replied.message
+        };
     }
 
-    getQuotedText(m) {
-        const quotedMsg = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
-        if (!quotedMsg) return '';
-        return quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || quotedMsg.imageMessage?.caption || '';
+    async getQuotedText(ctx) {
+        const replied = await ctx.replied?.().catch(() => null);
+        if (!replied?.message) return '';
+        const msg = replied.message;
+        return msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || '';
     }
 
-    async getImageInput(m) {
-        if (m.message.imageMessage) {
+    async getImageInput(ctx) {
+        if (ctx.message?.imageMessage) {
             return {
-                buffer: await downloadMediaMessage(m, 'buffer', {}),
-                mimeType: m.message.imageMessage.mimetype || 'image/jpeg'
+                buffer: await ctx.media?.buffer(),
+                mimeType: ctx.message?.imageMessage.mimetype || 'image/jpeg'
             };
         }
 
-        const quotedMsg = m.message.extendedTextMessage?.contextInfo?.quotedMessage;
+        const quotedMsg = (await ctx.replied().catch(()=>null))?.message;
         if (quotedMsg?.imageMessage) {
             const quotedM = {
                 message: { imageMessage: quotedMsg.imageMessage },
-                key: m.key
+                key: ctx.key
             };
             return {
-                buffer: await downloadMediaMessage(quotedM, 'buffer', {}),
+                buffer: await (await ctx.replied().catch(()=>null))?.media?.buffer(),
                 mimeType: quotedMsg.imageMessage.mimetype || 'image/jpeg'
             };
         }
@@ -538,45 +539,45 @@ class ELFeature extends BaseFeature {
         }
     }
 
-    async generateOrEditMedia(sock, remoteJid, m, statusMessage, startMs, prompt, imagePayload, mode, size) {
+    async generateOrEditMedia(client, remoteJid, ctx, statusMessage, startMs, prompt, imagePayload, mode, size) {
         const agnesClient = new AgnesImageClient();
         const isStickerOutput = mode === 'generate_sticker' || mode === 'edit_sticker';
         const isEditMode = mode === 'edit_image' || mode === 'edit_sticker';
 
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Menyiapkan prompt gambar...');
+        await this.editStatus(client, remoteJid, statusMessage, startMs, 'Menyiapkan prompt gambar...');
 
         let result;
         if (isEditMode) {
             if (!imagePayload) throw new Error('Mode edit butuh gambar atau sticker sebagai input.');
-            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Mengedit media...');
+            await this.editStatus(client, remoteJid, statusMessage, startMs, 'Mengedit media...');
             const imageDataUri = `data:${imagePayload.mimeType};base64,${imagePayload.buffer.toString('base64')}`;
             result = await agnesClient.edit(prompt, imageDataUri, size);
         } else {
-            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Generating gambar...');
+            await this.editStatus(client, remoteJid, statusMessage, startMs, 'Generating gambar...');
             result = await agnesClient.generate(prompt, size);
         }
 
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Mengirim hasil...');
+        await this.editStatus(client, remoteJid, statusMessage, startMs, 'Mengirim hasil...');
 
         if (isStickerOutput) {
             const stickerBuffer = await sharp(result.buffer)
                 .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
                 .webp({ lossless: true })
                 .toBuffer();
-            await sock.sendMessage(remoteJid, { sticker: stickerBuffer }, { quoted: m });
+            await client.sendMessage(remoteJid, { sticker: stickerBuffer }, );
         } else {
-            await sock.sendMessage(remoteJid, { image: result.buffer, mimetype: result.mime || 'image/png' }, { quoted: m });
+            await client.sendMessage(remoteJid, { image: result.buffer, mimetype: result.mime || 'image/png' }, );
         }
 
-        await this.finishStatus(sock, remoteJid, statusMessage, 'Selesai.', m);
+        await this.finishStatus(client, remoteJid, statusMessage, 'Selesai.', m);
     }
 
-    async handleChat(sock, remoteJid, statusMessage, startMs, finalPrompt, client, intent) {
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Menyusun jawaban...');
+    async handleChat(client, remoteJid, statusMessage, startMs, finalPrompt, clientRouter, intent) {
+        await this.editStatus(client, remoteJid, statusMessage, startMs, 'Menyusun jawaban...');
         let rawAnswer = null;
 
         if (intent?.needs_search) {
-            await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Coba Google search...');
+            await this.editStatus(client, remoteJid, statusMessage, startMs, 'Coba Google search...');
             
             // Ambil data mentah (raw) dari Google AI
             const googleRaw = await getGoogleAiSearchData(
@@ -586,15 +587,15 @@ class ELFeature extends BaseFeature {
 
             if (googleRaw) {
                 // Gunakan vpscombo untuk merapikan hasil Google AI
-                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan jawaban search...');
-                rawAnswer = await client.chat(buildAnswerMessages(finalPrompt, { source: "Google ", data: googleRaw }), config.router?.chatModel || 'vpscombo');
+                await this.editStatus(client, remoteJid, statusMessage, startMs, 'Merapikan jawaban search...');
+                rawAnswer = await clientRouter.chat(buildAnswerMessages(finalPrompt, { source: "Google ", data: googleRaw }), config.router?.chatModel || 'vpscombo');
             } else {
-                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Google gagal, fallback search...');
-                const searchData = await client.search(intent.refined_prompt || finalPrompt, 8);
-                rawAnswer = await client.chat(buildAnswerMessages(finalPrompt, searchData), config.router?.chatModel || 'vpscombo');
+                await this.editStatus(client, remoteJid, statusMessage, startMs, 'Google gagal, fallback search...');
+                const searchData = await clientRouter.search(intent.refined_prompt || finalPrompt, 8);
+                rawAnswer = await clientRouter.chat(buildAnswerMessages(finalPrompt, searchData), config.router?.chatModel || 'vpscombo');
             }
         } else {
-            rawAnswer = await client.chat([
+            rawAnswer = await clientRouter.chat([
                 {
                     role: 'system',
                     content: buildSystemInstruction() + '\n\nJawab langsung, singkat, natural, dan to the point.'
@@ -606,11 +607,11 @@ class ELFeature extends BaseFeature {
             ], config.router?.chatModel || 'vpscombo');
         }
 
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Merapikan format...');
+        await this.editStatus(client, remoteJid, statusMessage, startMs, 'Merapikan format...');
         let output = normalizeOutput(rawAnswer);
 
         if (!output) {
-            const retryAnswer = await client.chat([
+            const retryAnswer = await clientRouter.chat([
                 {
                     role: 'system',
                     content: buildSystemInstruction() + '\n\nJawab ulang pertanyaan user secara langsung. Output hanya jawaban final, jangan kosong.'
@@ -630,8 +631,8 @@ class ELFeature extends BaseFeature {
         return output;
     }
 
-    async handleToolCall(sock, remoteJid, m, statusMessage, startMs, refinedPrompt) {
-        await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Mengalihkan ke fitur terkait...');
+    async handleToolCall(client, remoteJid, ctx, statusMessage, startMs, refinedPrompt) {
+        await this.editStatus(client, remoteJid, statusMessage, startMs, 'Mengalihkan ke fitur terkait...');
         const text = String(refinedPrompt || '').toLowerCase();
         
         const isToSticker = /(stiker|sticker)/.test(text) && !/(gambar|foto|image|img)/.test(text);
@@ -647,63 +648,61 @@ class ELFeature extends BaseFeature {
         }
 
         if (!targetFeature) {
-            await this.finishStatus(sock, remoteJid, statusMessage, '❌ Maaf, EL-RUWET AI tidak mengerti fitur apa yang dimaksud.');
+            await this.finishStatus(client, remoteJid, statusMessage, '❌ Maaf, EL-RUWET AI tidak mengerti fitur apa yang dimaksud.', ctx);
             return;
         }
 
-        await this.finishStatus(sock, remoteJid, statusMessage, `Memproses via fitur ${targetFeature.name}...`);
-        await targetFeature.execute(m, sock, []);
+        await this.finishStatus(client, remoteJid, statusMessage, `Memproses via fitur ${targetFeature.name}...`, ctx);
+        await targetFeature.execute(ctx, client, []);
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         let statusMessage;
         const startMs = Date.now();
+        const remoteJid = ctx.remoteJid;
 
         try {
             let prompt = args.join(' ');
 
-            if (m.message.imageMessage?.caption && !prompt) {
-                prompt = m.message.imageMessage.caption.replace(/^\.el\s*/i, '').trim();
+            if (ctx.message?.imageMessage?.caption && !prompt) {
+                prompt = ctx.message?.imageMessage.caption.replace(/^\.el\s*/i, '').trim();
             }
 
-            const quotedText = this.getQuotedText(m);
+            const quotedText = await this.getQuotedText(ctx);
             if (quotedText) {
                 prompt = prompt
                     ? `Konteks pesan yang di-reply: "${quotedText}"\n\nPertanyaan maupun Pernyataan: ${prompt}`
                     : quotedText;
             }
 
-            const imageInput = await this.getImageInput(m).catch((error) => {
+            const imageInput = await this.getImageInput(ctx).catch((error) => {
                 console.error('Error downloading image:', error.message);
                 return null;
             });
 
             if (!prompt && !imageInput) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: '❌ Masukkan pertanyaan atau kirim/reply gambar!\n\n*Contoh:*\n• `.el halo`\n• `.el siapa presiden indonesia?`\n• Kirim gambar + caption `.el apa ini?`\n• Reply gambar + `.el bikin gambar kucing lucuu`'
-                });
+                await client.send(remoteJid).text('❌ Masukkan pertanyaan atau kirim/reply gambar!\n\n*Contoh:*\n• `.el halo`\n• `.el siapa presiden indonesia?`\n• Kirim gambar + caption `.el apa ini?`\n• Reply gambar + `.el bikin gambar kucing lucuu`');
                 return;
             }
 
-            const client = new RouterClient();
-            const remoteJid = m.key.remoteJid;
-            statusMessage = await this.sendStatus(sock, remoteJid, m, startMs, 'Memahami permintaan...');
+            const clientRouter = new RouterClient();
+            statusMessage = await this.sendStatus(client, remoteJid, ctx, startMs, 'Memahami permintaan...');
 
             const userPrompt = prompt || 'Jelaskan isi media ini secara ringkas dan jelas.';
-            const intent = await this.detectIntentAndSearch(userPrompt, Boolean(imageInput), client);
+            const intent = await this.detectIntentAndSearch(userPrompt, Boolean(imageInput), clientRouter);
 
             if (intent.mode === 'analyze') {
-                await this.editStatus(sock, remoteJid, statusMessage, startMs, 'Media terdeteksi, membaca gambar...');
-                const output = normalizeOutput(await client.chat(buildVisionMessages(intent.refined_prompt, imageInput.buffer.toString('base64'), imageInput.mimeType)));
-                await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
-                await this.finishStatus(sock, remoteJid, statusMessage, output, m);
+                await this.editStatus(client, remoteJid, statusMessage, startMs, 'Media terdeteksi, membaca gambar...');
+                const output = normalizeOutput(await clientRouter.chat(buildVisionMessages(intent.refined_prompt, imageInput.buffer.toString('base64'), imageInput.mimeType)));
+                await ctx.react('');
+                await this.finishStatus(client, remoteJid, statusMessage, output, ctx);
             } 
             else if (['generate_image', 'generate_sticker', 'edit_image', 'edit_sticker'].includes(intent.mode)) {
-                await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
+                await ctx.react('');
                 await this.generateOrEditMedia(
-                    sock,
+                    client,
                     remoteJid,
-                    m,
+                    ctx,
                     statusMessage,
                     startMs,
                     intent.refined_prompt,
@@ -713,13 +712,13 @@ class ELFeature extends BaseFeature {
                 );
             } 
             else if (intent.mode === 'tool_call') {
-                await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
-                await this.handleToolCall(sock, remoteJid, m, statusMessage, startMs, intent.refined_prompt);
+                await ctx.react('');
+                await this.handleToolCall(client, remoteJid, ctx, statusMessage, startMs, intent.refined_prompt);
             }
             else {
-                const output = await this.handleChat(sock, remoteJid, statusMessage, startMs, buildFinalPrompt(intent.refined_prompt), client, intent);
-                await sock.sendMessage(remoteJid, { react: { text: '', key: m.key } });
-                await this.finishStatus(sock, remoteJid, statusMessage, output, m);
+                const output = await this.handleChat(client, remoteJid, statusMessage, startMs, buildFinalPrompt(intent.refined_prompt), clientRouter, intent);
+                await ctx.react('');
+                await this.finishStatus(client, remoteJid, statusMessage, output, ctx);
             }
         } catch (error) {
             if (statusMessage?.key) {
@@ -730,12 +729,13 @@ class ELFeature extends BaseFeature {
             }
 
             console.error('ELFeature error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '❌', key: m.key } });
-            await sock.sendMessage(m.key.remoteJid, {
-                text: `❌ Maaf, terjadi kesalahan: ${error.message}`
-            });
+            await ctx.react('❌');
+            await client.send(remoteJid).text(`❌ Maaf, terjadi kesalahan: ${error.message}`);
         }
     }
 }
 
 module.exports = ELFeature;
+
+
+

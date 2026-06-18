@@ -6,76 +6,60 @@ class DemoteFeature extends BaseFeature {
         super('demote', 'Cabut admin member', false, 'admin');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.roomId;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await ctx.reply('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderId;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa demote member!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await ctx.reply('❌ Hanya admin yang bisa demote member!');
                 return;
             }
 
-            if (!await AdminHelper.isBotAdmin(sock, groupId)) {
-                await sock.sendMessage(groupId, { text: '❌ Bot harus jadi admin untuk demote member!' });
+            if (!await AdminHelper.isBotAdmin(client, groupId)) {
+                await ctx.reply('❌ Bot harus jadi admin untuk demote member!');
                 return;
             }
 
-            const targetJid = AdminHelper.extractJid(m);
-            
-            console.log('[DEMOTE] ======================');
-            console.log('[DEMOTE] Command executed');
-            console.log('[DEMOTE] Group:', groupId);
-            console.log('[DEMOTE] Sender:', senderId);
-            console.log('[DEMOTE] Target JID:', targetJid);
+            const targetJid = await AdminHelper.extractJidFromCtx(ctx);
             
             if (!targetJid) {
-                console.log('[DEMOTE] ❌ No target JID found');
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Tag atau reply pesan admin yang ingin di-demote!\n\nContoh:\n> `/demote @user`\n> Reply pesan + `/demote`' 
-                });
+                await ctx.reply('❌ Tag atau reply pesan admin yang ingin di-demote!\n\nContoh:\n> `/demote @user`\n> Reply pesan + `/demote`');
                 return;
             }
-            
+
             // Check if target is bot
-            console.log('[DEMOTE] Checking if target is bot...');
-            if (await AdminHelper.isBotJid(sock, targetJid, groupId)) {
-                console.log('[DEMOTE] 🚫 BLOCKED - Target is bot!');
-                await sock.sendMessage(groupId, { text: '🛡️' });
+            if (await AdminHelper.isBotJid(client, targetJid, groupId)) {
+                await ctx.reply('🛡️');
                 return;
             }
-            
+
             // Check if target is protected
-            console.log('[DEMOTE] Checking if target is protected...');
             if (AdminHelper.isProtected(targetJid)) {
-                console.log('[DEMOTE] 🚫 BLOCKED - Target is protected!');
-                await sock.sendMessage(groupId, { text: '🛡️' });
-                return;
-            }
-            
-            console.log('[DEMOTE] ✅ All checks passed, proceeding with demote...')
-
-            if (!await AdminHelper.isGroupAdmin(sock, groupId, targetJid)) {
-                await sock.sendMessage(groupId, { text: '❌ Member ini bukan admin!' });
+                await ctx.reply('🛡️');
                 return;
             }
 
-            await sock.groupParticipantsUpdate(groupId, [targetJid], 'demote');
+            if (!await AdminHelper.isGroupAdmin(client, groupId, targetJid)) {
+                await ctx.reply('❌ Member ini bukan admin!');
+                return;
+            }
+
+            await client.group.demote(groupId, [targetJid]);
             
-            await sock.sendMessage(groupId, { 
-                text: `✅ Admin berhasil di-demote!`,
+            await ctx.reply(`✅ Admin berhasil di-demote!`, {
                 mentions: [targetJid]
             });
 
         } catch (error) {
             console.error('Demote error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal demote admin!' });
+            await ctx.reply('❌ Gagal demote admin!');
         }
     }
 }

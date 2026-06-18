@@ -1,11 +1,13 @@
 const config = require('../config/config');
 const ProtectionSystem = require('./ProtectionSystem');
+const { normalizeUserJid, stripDevice } = require('./JidHelper');
 
 class AdminHelper {
-    static async isGroupAdmin(sock, groupId, userId) {
+    static async isGroupAdmin(client, groupId, userId) {
         try {
-            const metadata = await sock.groupMetadata(groupId);
-            const participant = metadata.participants.find(p => p.id === userId);
+            const target = normalizeUserJid(userId);
+            const metadata = await client.group.metadata(groupId);
+            const participant = metadata.participants.find(p => normalizeUserJid(p.id) === target || p.id === userId);
             return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
         } catch (error) {
             console.error('isGroupAdmin error:', error);
@@ -13,18 +15,21 @@ class AdminHelper {
         }
     }
 
-    static async isBotAdmin(sock, groupId) {
+    static async isBotAdmin(client, groupId) {
         try {
-            await sock.groupInviteCode(groupId);
-            return true;
+            const metadata = await client.group.metadata(groupId);
+            const botId = normalizeUserJid(client.user?.id || client.me?.id || '');
+            const participant = metadata.participants.find(p => normalizeUserJid(p.id) === botId);
+            return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
         } catch (error) {
             return false;
         }
     }
 
-    static async isBotJid(sock, userId, groupId) {
-        if (!sock.user || !sock.user.id) {
-            console.log('[BOT CHECK] ❌ No sock.user.id');
+    static async isBotJid(client, userId, groupId) {
+        const botJid = client.user?.id || client.me?.id;
+        if (!botJid) {
+            console.log('[BOT CHECK] ❌ No client.user.id');
             return false;
         }
         
@@ -40,7 +45,7 @@ class AdminHelper {
             return true;
         }
         
-        const botNumber = sock.user.id.split(':')[0];
+        const botNumber = botJid.split(':')[0];
         const targetNumber = userId
             .replace('@s.whatsapp.net', '')
             .replace('@c.us', '')
@@ -54,7 +59,7 @@ class AdminHelper {
         // If not bot by number and groupId provided, check all bot JIDs in group
         if (!isBot && groupId) {
             try {
-                const metadata = await sock.groupMetadata(groupId);
+                const metadata = await client.group.metadata(groupId);
                 console.log('[BOT CHECK] All participants:', metadata.participants.map(p => p.id));
                 
                 const botJids = metadata.participants
@@ -73,7 +78,7 @@ class AdminHelper {
         }
         
         console.log('[BOT CHECK]');
-        console.log('  Bot ID:', sock.user.id);
+        console.log('  Bot ID:', botJid);
         console.log('  Bot Number:', botNumber);
         console.log('  Target JID:', userId);
         console.log('  Target Number:', targetNumber);
@@ -83,7 +88,8 @@ class AdminHelper {
     }
 
     static isOwner(userId) {
-        return userId.replace('@s.whatsapp.net', '') === config.ownerNumber;
+        const digits = stripDevice(userId).replace(/\D/g, '');
+        return digits === String(config.ownerNumber).replace(/\D/g, '');
     }
 
     static isProtected(userId) {
@@ -121,14 +127,14 @@ class AdminHelper {
         return isProtected;
     }
 
-    static async canExecuteAdminCommand(sock, groupId, userId) {
+    static async canExecuteAdminCommand(client, groupId, userId) {
         if (this.isOwner(userId)) return true;
-        return await this.isGroupAdmin(sock, groupId, userId);
+        return await this.isGroupAdmin(client, groupId, userId);
     }
 
-    static async getGroupAdmins(sock, groupId) {
+    static async getGroupAdmins(client, groupId) {
         try {
-            const metadata = await sock.groupMetadata(groupId);
+            const metadata = await client.group.metadata(groupId);
             return metadata.participants
                 .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
                 .map(p => p.id);
@@ -138,9 +144,9 @@ class AdminHelper {
         }
     }
 
-    static async getGroupMembers(sock, groupId) {
+    static async getGroupMembers(client, groupId) {
         try {
-            const metadata = await sock.groupMetadata(groupId);
+            const metadata = await client.group.metadata(groupId);
             return metadata.participants.map(p => ({
                 id: p.id,
                 admin: p.admin || 'member'
@@ -152,20 +158,31 @@ class AdminHelper {
     }
 
     static extractJid(message) {
-        // From mention
         if (message.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]) {
-            return message.message.extendedTextMessage.contextInfo.mentionedJid[0];
+            return normalizeUserJid(message.message.extendedTextMessage.contextInfo.mentionedJid[0]);
         }
-        // From reply
         if (message.message?.extendedTextMessage?.contextInfo?.participant) {
-            return message.message.extendedTextMessage.contextInfo.participant;
+            return normalizeUserJid(message.message.extendedTextMessage.contextInfo.participant);
         }
+        return null;
+    }
+
+    static async extractJidFromCtx(ctx) {
+        const mentioned = ctx.mentions?.[0];
+        if (mentioned) return normalizeUserJid(mentioned);
+
+        if (typeof ctx.replied === 'function') {
+            const replied = await ctx.replied().catch(() => null);
+            const repliedSender = replied?.senderId || replied?.sender?.jid || replied?.senderJid;
+            if (repliedSender) return normalizeUserJid(repliedSender);
+        }
+
         return null;
     }
 
     static formatPhoneNumber(number) {
         // Remove all non-digits
-        number = number.replace(/\D/g, '');
+        number = String(number).replace(/\D/g, '');
         
         // Add country code if not present
         if (!number.startsWith('62')) {
@@ -176,7 +193,7 @@ class AdminHelper {
             }
         }
         
-        return number + '@s.whatsapp.net';
+        return normalizeUserJid(number);
     }
 }
 

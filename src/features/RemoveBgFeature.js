@@ -1,5 +1,4 @@
 const BaseFeature = require('../core/BaseFeature');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
@@ -15,9 +14,7 @@ class RemoveBgFeature extends BaseFeature {
 
     async uploadToCatbox(buffer) {
         const tempDir = path.join(__dirname, '../../temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
         const tempPath = path.join(tempDir, `rmbg_${Date.now()}.png`);
         fs.writeFileSync(tempPath, buffer);
@@ -32,15 +29,10 @@ class RemoveBgFeature extends BaseFeature {
                 timeout: 30000
             });
 
-            if (!data || typeof data !== 'string' || !data.startsWith('https://')) {
-                throw new Error('Invalid response from Catbox');
-            }
-
+            if (!data || typeof data !== 'string' || !data.startsWith('https://')) throw new Error('Invalid response from Catbox');
             return data;
         } finally {
-            if (fs.existsSync(tempPath)) {
-                fs.unlinkSync(tempPath);
-            }
+            if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         }
     }
 
@@ -53,52 +45,30 @@ class RemoveBgFeature extends BaseFeature {
             timeout: 60000
         });
         
-        if (!data.success || !data.data) {
-            throw new Error('API removebg gagal');
-        }
-        
+        if (!data.success || !data.data) throw new Error('API removebg gagal');
         return data.data;
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            if (this.processing.has(m.key.remoteJid)) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!' 
-                });
+            if (this.processing.has(ctx.roomId)) {
+                await ctx.reply('⏳ Masih ada proses yang belum selesai, tunggu sebentar ya!');
                 return;
             }
 
-            const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = m.message.imageMessage || quoted?.imageMessage;
+            const quoted = await ctx.replied().catch(() => null);
+            const media = ctx.media || quoted?.media;
+            const buffer = await media?.buffer();
 
-            if (!imageMessage) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Reply atau kirim gambar dengan caption `.rmbg`' 
-                });
+            if (!buffer || media?.type !== 'image') {
+                await ctx.reply('❌ Reply atau kirim gambar dengan caption `.rmbg`');
                 return;
             }
 
-            this.processing.add(m.key.remoteJid);
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '⏳', key: m.key }
-            });
-
-            const buffer = await downloadMediaMessage(
-                { message: { imageMessage } },
-                'buffer',
-                {},
-                { logger: console, reuploadRequest: sock.updateMediaMessage }
-            );
+            this.processing.add(ctx.roomId);
 
             if (buffer.length > this.maxSize) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gambar terlalu besar! Maksimal 10MB' 
-                });
+                await ctx.reply('❌ Gambar terlalu besar! Maksimal 10MB');
                 return;
             }
 
@@ -107,24 +77,12 @@ class RemoveBgFeature extends BaseFeature {
                 imageUrl = await this.uploadToCatbox(buffer);
             } catch (uploadError) {
                 console.error('Catbox upload failed:', uploadError.message);
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Gagal upload gambar! Coba lagi nanti' 
-                });
+                await ctx.reply('❌ Gagal upload gambar! Coba lagi nanti');
                 return;
             }
 
             const resultUrl = await this.removeBg(imageUrl);
-
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-
-            // Send as document PNG
-            await sock.sendMessage(m.key.remoteJid, {
-                document: { url: resultUrl },
+            await client.send(ctx.roomId).document({ url: resultUrl }, {
                 mimetype: 'image/png',
                 fileName: 'nobg.png',
                 caption: '✅ Background berhasil dihapus!\n\n🔗 Link: ' + resultUrl
@@ -132,18 +90,13 @@ class RemoveBgFeature extends BaseFeature {
 
         } catch (error) {
             console.error('RemoveBg error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
             
             let errorMsg = '❌ Gagal hapus background!';
-            if (error.message.includes('API removebg gagal')) {
-                errorMsg = '❌ API RemoveBG sedang bermasalah! Coba lagi nanti';
-            }
+            if (error.message.includes('API removebg gagal')) errorMsg = '❌ API RemoveBG sedang bermasalah! Coba lagi nanti';
             
-            await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
+            await ctx.reply(errorMsg);
         } finally {
-            this.processing.delete(m.key.remoteJid);
+            this.processing.delete(ctx.roomId);
         }
     }
 }

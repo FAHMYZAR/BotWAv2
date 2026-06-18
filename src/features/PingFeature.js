@@ -5,20 +5,15 @@ class PingFeature extends BaseFeature {
         super('ping', 'Cek response time bot', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const start = Date.now();
-            await sock.sendMessage(m.key.remoteJid, { text: '🏓 Pong!' });
+            await client.send(ctx.roomId).text('🏓 Pong!');
             const latency = Date.now() - start;
-            await sock.sendMessage(m.key.remoteJid, { text: `⚡ Response time: ${latency}ms` });
+            await client.send(ctx.roomId).text(`⚡ Response time: ${latency}ms`);
         } catch (error) {
-            await this.handleError(m, sock, error);
+            await ctx.reply('❌ Terjadi kesalahan!');
         }
-    }
-
-    async handleError(m, sock, error) {
-        console.error(`${this.name} error:`, error);
-        await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan!' });
     }
 }
 

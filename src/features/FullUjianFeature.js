@@ -17,31 +17,23 @@ class FullUjianFeature extends BaseFeature {
         return `${dayName}, ${day} ${month} ${year}`;
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const data = await fetchJadwalKuliah();
 
             if (data.ujian?.isHtml) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `❌ *Login Gagal!*\n\n${data.ujian?.message}\n\nKemungkinan:\n• Session expired\n• Username/password salah\n• Server RAISING bermasalah` 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text(`❌ *Login Gagal!*\n\n${data.ujian?.message}\n\nKemungkinan:\n• Session expired\n• Username/password salah\n• Server RAISING bermasalah`);
                 return;
             }
 
             const ujianList = Array.isArray(data.ujian) ? data.ujian : [];
 
             if (ujianList.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '📅 *JADWAL UJIAN*\n\n✅ Tidak ada jadwal ujian!' 
-                });
+                await ctx.react('');
+                await client.send(ctx.remoteJid).text('📅 *JADWAL UJIAN*\n\n✅ Tidak ada jadwal ujian!');
                 return;
             }
 
@@ -75,16 +67,12 @@ class FullUjianFeature extends BaseFeature {
                 if (dateIndex < sortedDates.length - 1) message += `\n\n`;
             });
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { text: message });
+            await ctx.react('');
+            await client.send(ctx.remoteJid).text(message);
 
         } catch (error) {
             console.error('FullUjian error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `❌ Terjadi kesalahan saat mengambil jadwal ujian!\n\nError: ${error.message}` 
-            });
+            await client.send(ctx.remoteJid).text(`❌ Terjadi kesalahan saat mengambil jadwal ujian!\n\nError: ${error.message}`);
         }
     }
 }

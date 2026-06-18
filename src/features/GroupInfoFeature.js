@@ -6,16 +6,16 @@ class GroupInfoFeature extends BaseFeature {
         this.aliases = ['infogrup', 'infogroup'];
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.remoteJid;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const metadata = await sock.groupMetadata(groupId);
+            const metadata = await client.group.metadata(groupId);
             const admins = metadata.participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
             const members = metadata.participants.filter(p => !p.admin);
             
@@ -48,14 +48,12 @@ class GroupInfoFeature extends BaseFeature {
             message += `> Edit Info: ${metadata.restrict ? 'Hanya Admin' : 'Semua Member'}\n`;
 
             const mentions = metadata.owner ? [metadata.owner] : [];
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions
-            });
+            await client.send(groupId).text(message,
+                mentions);
 
         } catch (error) {
             console.error('GroupInfo error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal menampilkan info grup!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal menampilkan info grup!');
         }
     }
 }

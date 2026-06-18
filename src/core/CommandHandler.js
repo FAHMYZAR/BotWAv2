@@ -7,107 +7,95 @@ class CommandHandler {
         this.keynoteFeature = new KeynoteFeature();
     }
 
-    async handleOwnerCommands(m, sock) {
+    async handleOwnerCommands(ctx, client) {
         try {
-            const body = this.getMessageText(m);
+            const body = this.getMessageText(ctx);
             const command = body.slice(config.ownerPrefix.length).trim().split(' ')[0];
             const args = body.split(' ').slice(1);
 
-            // Check keynote first
-            if (await this.keynoteFeature.handleKeynote(m, sock)) return;
+            if (await this.keynoteFeature.handleKeynote(ctx, client)) return;
 
-            // Handle special owner commands
             if (command === 'setprefix') {
-                await this.handleSetPrefix(m, sock, args);
+                await this.handleSetPrefix(ctx, client, args);
                 return;
             }
 
             if (command === 'setkeyprefix') {
-                await this.keynoteFeature.setKeynotePrefix(m, sock, args);
+                await this.keynoteFeature.setKeynotePrefix(ctx, client, args);
                 return;
             }
 
             if (command === 'useprefixnote') {
-                await this.keynoteFeature.setUseKeynotePrefix(m, sock, args);
+                await this.keynoteFeature.setUseKeynotePrefix(ctx, client, args);
                 return;
             }
 
-            // Execute registered feature
             const feature = featureRegistry.get(command);
             if (feature) {
-                await feature.execute(m, sock, args);
+                await feature.execute(ctx, client, args);
             } else {
                 console.log(`[UNKNOWN CMD] Owner: /${command}`);
             }
-
         } catch (error) {
             console.error('Owner Command Error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan!' });
+            await this.reply(client, ctx, '❌ Terjadi kesalahan!');
         }
     }
 
-    async handleUserCommands(m, sock) {
+    async handleUserCommands(ctx, client) {
         try {
-            const body = this.getMessageText(m);
+            const body = this.getMessageText(ctx);
             const command = body.slice(config.userPrefix.length).trim().split(' ')[0];
             const args = body.split(' ').slice(1);
 
-            // Check keynote first
-            if (await this.keynoteFeature.handleKeynote(m, sock)) return;
+            if (await this.keynoteFeature.handleKeynote(ctx, client)) return;
 
-            // Execute registered feature
             const feature = featureRegistry.get(command);
             if (feature && !feature.ownerOnly) {
-                // Block admin category features with user prefix
                 if (feature.category === 'admin') {
-                    await sock.sendMessage(m.key.remoteJid, { 
-                        text: `❌ Fitur admin harus menggunakan prefix ${config.ownerPrefix}\n\nContoh: ${config.ownerPrefix}${command}` 
-                    });
+                    await this.reply(client, ctx, `❌ Fitur admin harus menggunakan prefix ${config.ownerPrefix}\n\nContoh: ${config.ownerPrefix}${command}`);
                     return;
                 }
-                await feature.execute(m, sock, args);
+                await feature.execute(ctx, client, args);
             } else {
                 console.log(`[UNKNOWN CMD] User: .${command}`);
             }
-
         } catch (error) {
             console.error('User Command Error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan!' });
+            await this.reply(client, ctx, '❌ Terjadi kesalahan!');
         }
     }
 
-    async handleSetPrefix(m, sock, args) {
+    async handleSetPrefix(ctx, client, args) {
         try {
             if (args[0] === 'owner') {
                 config.setOwnerPrefix(args[1]);
-                await sock.sendMessage(m.key.remoteJid, { text: '✅ Owner prefix updated!' });
+                await this.reply(client, ctx, '✅ Owner prefix updated!');
             } else if (args[0] === 'user') {
                 config.setUserPrefix(args[1]);
-                await sock.sendMessage(m.key.remoteJid, { text: '✅ User prefix updated!' });
+                await this.reply(client, ctx, '✅ User prefix updated!');
             } else if (args[0] === 'reset') {
                 config.reset();
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '✅ Prefixes reset to default!\n' +
-                          `*Owner Prefix:* ${config.ownerPrefix}\n` +
-                          `*User Prefix:* ${config.userPrefix}`
-                });
+                await this.reply(client, ctx, '✅ Prefixes reset to default!\n' +
+                    `*Owner Prefix:* ${config.ownerPrefix}\n` +
+                    `*User Prefix:* ${config.userPrefix}`);
             } else {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Format: !setprefix [owner/user/reset] [newPrefix]\n' +
-                          'Contoh: !setprefix owner /'
-                });
+                await this.reply(client, ctx, '❌ Format: !setprefix [owner/user/reset] [newPrefix]\n' +
+                    'Contoh: !setprefix owner /');
             }
         } catch (error) {
             console.error('SetPrefix Error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal mengubah prefix!' });
+            await this.reply(client, ctx, '❌ Gagal mengubah prefix!');
         }
     }
 
-    getMessageText(m) {
-        return m.message.conversation || 
-               m.message.extendedTextMessage?.text || 
-               m.message.imageMessage?.caption || 
-               m.message.videoMessage?.caption || '';
+    getMessageText(ctx) {
+        return ctx.body || ctx.text || '';
+    }
+
+    async reply(client, ctx, text) {
+        if (typeof ctx.reply === 'function') return ctx.reply(text);
+        return client.send(ctx.remoteJid || ctx.roomId || ctx.chatId).text(text);
     }
 }
 

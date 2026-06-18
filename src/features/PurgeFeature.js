@@ -9,31 +9,29 @@ class PurgeFeature extends BaseFeature {
         }
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const chatId = m.key.remoteJid;
-            const senderId = m.key.participant || m.key.remoteJid;
+            const chatId = ctx.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
             
             if (!chatId.endsWith('@g.us')) {
-                await sock.sendMessage(chatId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(chatId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, chatId, senderId)) {
-                await sock.sendMessage(chatId, { text: '❌ Hanya admin yang bisa purge!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, chatId, senderId)) {
+                await client.send(chatId).text('❌ Hanya admin yang bisa purge!');
                 return;
             }
             
-            if (!await AdminHelper.isBotAdmin(sock, chatId)) {
-                await sock.sendMessage(chatId, { text: '❌ Bot harus jadi admin untuk purge!' });
+            if (!await AdminHelper.isBotAdmin(client, chatId)) {
+                await client.send(chatId).text('❌ Bot harus jadi admin untuk purge!');
                 return;
             }
             
-            const quoted = m.message.extendedTextMessage?.contextInfo;
+            const quoted = ctx.message.extendedTextMessage?.contextInfo;
             if (!quoted || !quoted.stanzaId) {
-                await sock.sendMessage(chatId, { 
-                    text: '❌ Reply pesan yang ingin dijadikan awal purge!\n\nContoh:\n> Reply pesan + `/purge`' 
-                });
+                await client.send(chatId).text('❌ Reply pesan yang ingin dijadikan awal purge!\n\nContoh:\n> Reply pesan + `/purge`');
                 return;
             }
             
@@ -42,32 +40,28 @@ class PurgeFeature extends BaseFeature {
             
             const messagesToDelete = messageStore.filter(msg => {
                 const msgTimestamp = msg.messageTimestamp || 0;
-                return msgTimestamp >= quotedTimestamp && msg.key.id !== m.key.id;
+                return msgTimestamp >= quotedTimestamp && msg.key.id !== ctx.uniqueId;
             });
             
             if (messagesToDelete.length === 0) {
-                await sock.sendMessage(chatId, { 
-                    text: '❌ Tidak ada pesan yang bisa dihapus!\n\n_Note: Bot hanya bisa hapus pesan yang dikirim setelah bot online._' 
-                });
+                await client.send(chatId).text('❌ Tidak ada pesan yang bisa dihapus!\n\n_Note: Bot hanya bisa hapus pesan yang dikirim setelah bot online._');
                 return;
             }
             
-            const notif = await sock.sendMessage(chatId, { 
-                text: `🔥 Menghapus ${messagesToDelete.length} pesan...` 
-            });
+            const notif = await client.send(chatId).text(`🔥 Menghapus ${messagesToDelete.length} pesan...`);
             
             let deleted = 0;
             for (const msg of messagesToDelete) {
                 try {
-                    await sock.sendMessage(chatId, { delete: msg.key });
+                    await client.delete(msg.key);
                     deleted++;
                 } catch (e) {
                     console.log('[PURGE] Failed to delete:', msg.key.id);
                 }
             }
             
-            await sock.sendMessage(chatId, { delete: notif.key });
-            await sock.sendMessage(chatId, { delete: m.key });
+            await client.delete(notif.key);
+            await client.delete(ctx.key);
             
             global.messageStore[chatId] = messageStore.filter(msg => {
                 const msgTimestamp = msg.messageTimestamp || 0;
@@ -78,9 +72,7 @@ class PurgeFeature extends BaseFeature {
 
         } catch (error) {
             console.error('Purge error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Gagal purge! Error: ' + error.message
-            });
+            await client.send(ctx.remoteJid).text('❌ Gagal purge! Error: ' + error.message);
         }
     }
 }

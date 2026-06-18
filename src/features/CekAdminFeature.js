@@ -7,18 +7,18 @@ class CekAdminFeature extends BaseFeature {
         super('cekadmin', 'Cek status admin (debugging)', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
-            const senderId = m.key.participant || m.key.remoteJid;
+            const groupId = ctx.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
 
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
             const registeredGroup = await GroupSystem.get(groupId);
-            const isGroupAdmin = await AdminHelper.isGroupAdmin(sock, groupId, senderId);
+            const isGroupAdmin = await AdminHelper.isGroupAdmin(client, groupId, senderId);
             const isInDatabase = registeredGroup && registeredGroup.groupAdmins && registeredGroup.groupAdmins.includes(senderId);
 
             let message = `🔍 *CEK STATUS ADMIN*\n\n`;
@@ -48,14 +48,12 @@ class CekAdminFeature extends BaseFeature {
                 mentions.push(...registeredGroup.groupAdmins);
             }
 
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions: mentions
-            });
+            await client.send(groupId).text(message).mentions(mentions
+            );
 
         } catch (error) {
             console.error('CekAdmin error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal cek status admin!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal cek status admin!');
         }
     }
 }

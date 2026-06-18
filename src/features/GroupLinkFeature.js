@@ -7,42 +7,42 @@ class GroupLinkFeature extends BaseFeature {
         this.aliases = ['linkgrup', 'linkgroup'];
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.remoteJid;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa ambil link grup!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await client.send(groupId).text('❌ Hanya admin yang bisa ambil link grup!');
                 return;
             }
 
-            if (!await AdminHelper.isBotAdmin(sock, groupId)) {
-                await sock.sendMessage(groupId, { text: '❌ Bot harus jadi admin untuk ambil link grup!' });
+            if (!await AdminHelper.isBotAdmin(client, groupId)) {
+                await client.send(groupId).text('❌ Bot harus jadi admin untuk ambil link grup!');
                 return;
             }
 
-            const code = await sock.groupInviteCode(groupId);
+            const code = await client.group.inviteCode(groupId);
             const link = `https://chat.whatsapp.com/${code}`;
             
-            const metadata = await sock.groupMetadata(groupId);
+            const metadata = await client.group.metadata(groupId);
             
             let message = `🔗 *LINK GRUP*\n\n`;
             message += `*Nama:* ${metadata.subject}\n`;
             message += `*Link:* ${link}\n\n`;
             message += `_Jangan share ke sembarang orang!_`;
 
-            await sock.sendMessage(groupId, { text: message });
+            await client.send(groupId).text(message);
 
         } catch (error) {
             console.error('GroupLink error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal mendapatkan link grup!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal mendapatkan link grup!');
         }
     }
 }

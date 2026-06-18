@@ -1,6 +1,5 @@
 const BaseFeature = require('../core/BaseFeature');
 const SystemHelper = require('../utils/SystemHelper');
-const { prepareWAMessageMedia, generateWAMessageFromContent, proto } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -10,7 +9,7 @@ class StatusFeature extends BaseFeature {
         super('status', 'Tampilkan status system', false, 'tools');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const uptime = SystemHelper.getUptime();
             const memory = SystemHelper.getMemoryInfo();
@@ -63,7 +62,7 @@ class StatusFeature extends BaseFeature {
 
             statusText += `_🔥 EL-RUWET [BOT + AI] © ${new Date().getFullYear()}_`;
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 image: bannerBuffer,
                 caption: statusText
             });
@@ -75,8 +74,9 @@ class StatusFeature extends BaseFeature {
 
     async handleError(m, sock, error) {
         console.error(`${this.name} error:`, error);
-        await sock.sendMessage(m.key.remoteJid, { text: '❌ Terjadi kesalahan!' });
+        await client.sendMessage(ctx.remoteJid, { text: '❌ Terjadi kesalahan!' });
     }
 }
 
 module.exports = StatusFeature;
+

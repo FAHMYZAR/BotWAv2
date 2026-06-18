@@ -1,7 +1,6 @@
 const BaseFeature = require('../core/BaseFeature');
 const axios = require('axios');
 const cheerio = require('cheerio');
-
 const config = require('../config/config');
 
 class CekSholatFeature extends BaseFeature {
@@ -17,7 +16,6 @@ class CekSholatFeature extends BaseFeature {
         do {
             index = Math.floor(Math.random() * this.banners.length);
         } while (index === this.lastBannerIndex && this.banners.length > 1);
-        
         this.lastBannerIndex = index;
         return this.banners[index];
     }
@@ -33,12 +31,9 @@ class CekSholatFeature extends BaseFeature {
 
     async fetchPage(slug = '') {
         const url = slug ? `${this.baseUrl}/${slug}` : this.baseUrl;
-        console.log('[CEKSHOLAT] Fetch page:', url);
         const response = await axios.get(url, {
             timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
         return cheerio.load(response.data);
     }
@@ -96,7 +91,6 @@ class CekSholatFeature extends BaseFeature {
 
     async resolveCity(kota) {
         const slug = this.slugify(kota);
-        console.log('[CEKSHOLAT] Resolve city:', kota, '->', slug);
         try {
             const page = await this.fetchPage(slug);
             const cities = this.extractCities(page);
@@ -122,7 +116,6 @@ class CekSholatFeature extends BaseFeature {
 
         let diffMs = targetDate.getTime() - localNow.getTime();
         if (diffMs < 0) {
-            // Jika sudah lewat, targetnya besok
             targetDate.setDate(targetDate.getDate() + 1);
             diffMs = targetDate.getTime() - localNow.getTime();
         }
@@ -136,37 +129,29 @@ class CekSholatFeature extends BaseFeature {
         return res.trim() || 'kurang dari 1 menit';
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
+            const targetJid = ctx.roomId || ctx.senderId;
             const kota = args.join(' ');
-            console.log('[CEKSHOLAT] Command args:', args);
 
             if (!kota) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    text: '❌ Masukkan nama kota!\n\nContoh:\n> `.ceksholat Blora`\n> `.ceksholat Bantul`\n> `.ceksholat Sleman`'
-                });
+                await ctx.reply('❌ Masukkan nama kota!\n\nContoh:\n> `.ceksholat Blora`\n> `.ceksholat Bantul`\n> `.ceksholat Sleman`');
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '🕌', key: m.key }
-            });
+            await ctx.react('🕌');
 
             const { label, page } = await this.resolveCity(kota);
             const jadwal = this.extractTodaySchedule(page);
             const activePrayer = this.extractActivePrayer(page);
 
             if (!jadwal) {
-                await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
-                await sock.sendMessage(m.key.remoteJid, { text: '❌ Jadwal sholat tidak tersedia untuk hari ini!' });
+                await ctx.reply('❌ Jadwal sholat tidak tersedia untuk hari ini!');
                 return;
             }
 
             const sourceUrl = `${this.baseUrl}/${this.slugify(label)}`;
             const countdown = activePrayer?.time ? this.getCountdown(activePrayer.time) : '';
-            const banner = this.getRandomBanner();
-            const senderId = m.key.participant || m.key.remoteJid;
-
             let message = `*Jadwal Sholat ${String(label).toUpperCase()}*\n\n`;
             message += `*Jadwal*\n`;
             message += `*Tanggal: ${jadwal.tanggal}*\n`;
@@ -181,43 +166,26 @@ class CekSholatFeature extends BaseFeature {
                 message += `\n\n_Menuju ${activePrayer.name} ${countdown}_`;
             }
 
-            console.log('[CEKSHOLAT] Sending interactive message...');
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
+            await ctx.react('');
 
             try {
-                await sock.sendMessage(m.key.remoteJid, {
-                    interactiveMessage: {
-                        title: `${message}`,
-                        footer: '© EL-RUWET TEAM',
-                        thumbnail: banner,
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: 'cta_url',
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: 'Source',
-                                        url: sourceUrl
-                                    })
-                                }
-                            ]
-                        }
-                    }
-                });
+                const banner = this.getRandomBanner();
+                await client.send(targetJid).buttons(
+                    [{ type: 'url', text: 'Source Jadwal', url: sourceUrl }],
+                    { image: banner, text: message, footer: '© EL-RUWET TEAM' }
+                );
             } catch (err) {
-                console.log('[CEKSHOLAT] Interactive failed, sending text fallback:', err.message);
-                await sock.sendMessage(m.key.remoteJid, { text: message });
+                await client.send(targetJid).text(message + '\n\n' + sourceUrl);
             }
-            console.log('[CEKSHOLAT] Message sent');
         } catch (error) {
             console.error('CekSholat error:', error.message, error.stack);
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '', key: m.key } });
             let errorMsg = '❌ Terjadi kesalahan saat mengecek jadwal sholat!';
             if (error.message === 'Kota tidak ditemukan') {
                 errorMsg = '❌ Kota tidak ditemukan! Pastikan nama kota benar.';
             } else if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
                 errorMsg = '❌ Koneksi bermasalah, coba lagi nanti!';
             }
-            await sock.sendMessage(m.key.remoteJid, { text: errorMsg });
+            await ctx.reply(errorMsg);
         }
     }
 }

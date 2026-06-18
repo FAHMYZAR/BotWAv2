@@ -8,20 +8,20 @@ class SyncAdminFeature extends BaseFeature {
         super('syncadmin', 'Sinkronkan admin grup ke database', false, 'admin');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
-            const senderId = m.key.participant || m.key.remoteJid;
-            const isOwner = m.key.fromMe || senderId.replace('@s.whatsapp.net', '') === config.ownerNumber;
+            const groupId = ctx.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
+            const isOwner = ctx.key.fromMe || senderId.replace('@s.whatsapp.net', '') === config.ownerNumber;
 
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
                 return;
             }
 
             const registeredGroup = await GroupSystem.get(groupId);
             if (!registeredGroup) {
-                await sock.sendMessage(groupId, { 
+                await client.sendMessage(groupId, { 
                     text: '❌ Grup belum terdaftar! Daftar dulu dengan `/daftargc [kota]`' 
                 });
                 return;
@@ -30,7 +30,7 @@ class SyncAdminFeature extends BaseFeature {
             const isGroupAdmin = await AdminHelper.isGroupAdmin(sock, groupId, senderId);
             
             if (!isOwner && !isGroupAdmin) {
-                await sock.sendMessage(groupId, { 
+                await client.sendMessage(groupId, { 
                     text: '❌ Hanya owner bot atau admin grup yang bisa sync admin!' 
                 });
                 return;
@@ -53,16 +53,17 @@ class SyncAdminFeature extends BaseFeature {
             });
             message += `\n_Semua admin sekarang bisa pakai prefix \`/\`_`;
 
-            await sock.sendMessage(groupId, { 
+            await client.sendMessage(groupId, { 
                 text: message,
                 mentions: admins
             });
 
         } catch (error) {
             console.error('SyncAdmin error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal sync admin!' });
+            await client.sendMessage(ctx.remoteJid, { text: '❌ Gagal sync admin!' });
         }
     }
 }
 
 module.exports = SyncAdminFeature;
+

@@ -7,15 +7,13 @@ class ProtectFeature extends BaseFeature {
         super('protect', 'Tambah user ke protected list', true, 'owner');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
-            const targetJid = AdminHelper.extractJid(m);
+            const groupId = ctx.remoteJid;
+            const targetJid = await AdminHelper.extractJidFromCtx(ctx);
             
             if (!targetJid) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Tag atau reply pesan user yang ingin diproteksi!\n\nContoh:\n> `/protect @user`\n> Reply pesan + `/protect`' 
-                });
+                await client.send(groupId).text('❌ Tag atau reply pesan user yang ingin diproteksi!\n\nContoh:\n> `/protect @user`\n> Reply pesan + `/protect`');
                 return;
             }
 
@@ -32,20 +30,15 @@ class ProtectFeature extends BaseFeature {
             const addedJid = ProtectionSystem.addJid(targetJid);
 
             if (addedNumber || addedJid) {
-                await sock.sendMessage(groupId, { 
-                    text: `✅ User berhasil diproteksi!\n\nNumber: ${number}\nJID: ${targetJid}\n\n🛡️ User ini tidak bisa di-kick, demote, atau warn.`,
-                    mentions: [targetJid]
-                });
+                await client.send(groupId).text(`✅ User berhasil diproteksi!\n\nNumber: ${number}\nJID: ${targetJid}\n\n🛡️ User ini tidak bisa di-kick, demote, atau warn.`).mentions([targetJid]);
             } else {
-                await sock.sendMessage(groupId, { 
-                    text: '⚠️ User sudah ada di protected list!',
-                    mentions: [targetJid]
-                });
+                await client.send(groupId).text('⚠️ User sudah ada di protected list!').mentions([targetJid]
+                );
             }
 
         } catch (error) {
             console.error('Protect error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal memproteksi user!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal memproteksi user!');
         }
     }
 }

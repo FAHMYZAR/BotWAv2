@@ -1,6 +1,8 @@
+const { normalizeRecipient, normalizeUserJid } = require('./JidHelper');
+
 class GreetingsHandler {
-    constructor(sock) {
-        this.sock = sock;
+    constructor(client) {
+        this.client = client;
         this.welcomeBanner = 'https://files.catbox.moe/fghoxj.webp';
         this.goodbyeBanner = 'https://files.catbox.moe/5cl9sb.jpg';
         this.processing = new Set();
@@ -16,8 +18,9 @@ class GreetingsHandler {
         this.processing.add(key);
         
         try {
-            const groupMetadata = await this.sock.groupMetadata(groupJid);
-            const mentions = participants.map(p => p.phoneNumber || p.id || p);
+            groupJid = normalizeRecipient(groupJid);
+            const groupMetadata = await this.client.group.metadata(groupJid);
+            const mentions = participants.map(p => normalizeUserJid(p.phoneNumber || p.id || p)).filter(Boolean);
             const names = mentions.map(p => `@${p.split('@')[0]}`).join(', ');
             
             let message = `👋 *SELAMAT DATANG!*\n\n`;
@@ -25,19 +28,7 @@ class GreetingsHandler {
             message += `Selamat bergabung di *${groupMetadata.subject}*\n\n`;
             message += `Semoga betah dan jangan lupa baca deskripsi grup ya!`;
 
-            await this.sock.sendMessage(groupJid, {
-                text: message,
-                mentions: mentions,
-                contextInfo: {
-                    externalAdReply: {
-                        title: 'Selamat Datang!',
-                        body: groupMetadata.subject,
-                        thumbnailUrl: this.welcomeBanner,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
-                    }
-                }
-            });
+            await this.client.send(groupJid).text(message).mentions(mentions);
         } catch (error) {
             console.error('[GREETINGS] Join error:', error.message);
         } finally {
@@ -55,8 +46,9 @@ class GreetingsHandler {
         this.processing.add(key);
         
         try {
-            const groupMetadata = await this.sock.groupMetadata(groupJid);
-            const mentions = participants.map(p => p.phoneNumber || p.id || p);
+            groupJid = normalizeRecipient(groupJid);
+            const groupMetadata = await this.client.group.metadata(groupJid);
+            const mentions = participants.map(p => normalizeUserJid(p.phoneNumber || p.id || p)).filter(Boolean);
             const names = mentions.map(p => `@${p.split('@')[0]}`).join(', ');
             
             let message = `👋 *SAYONARA!*\n\n`;
@@ -64,19 +56,7 @@ class GreetingsHandler {
             message += `Semoga sukses selalu di luar sana!\n`;
             message += `Terima kasih sudah menjadi bagian dari *${groupMetadata.subject}*`;
 
-            await this.sock.sendMessage(groupJid, {
-                text: message,
-                mentions: mentions,
-                contextInfo: {
-                    externalAdReply: {
-                        title: 'Sayonara!',
-                        body: groupMetadata.subject,
-                        thumbnailUrl: this.goodbyeBanner,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
-                    }
-                }
-            });
+            await this.client.send(groupJid).text(message).mentions(mentions);
         } catch (error) {
             console.error('[GREETINGS] Leave error:', error.message);
         } finally {

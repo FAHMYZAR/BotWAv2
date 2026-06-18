@@ -6,12 +6,10 @@ class DelNoteFeature extends BaseFeature {
         super('delnote', 'Hapus catatan', true, 'owner');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             if (!args.length) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: '❌ Format: !delnote [nama]\n\n📝 Contoh: !delnote aku' 
-                });
+                await client.send(ctx.remoteJid).text('❌ Format: !delnote [nama]\n\n📝 Contoh: !delnote aku');
                 return;
             }
 
@@ -19,9 +17,7 @@ class DelNoteFeature extends BaseFeature {
             const note = await KeynoteSystem.getKeynote(noteName);
 
             if (!note) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `❌ *Catatan tidak ditemukan!*\n\n📝 Nama: ${noteName}\n⚠️ Catatan tidak ada di database`
-                });
+                await client.send(ctx.remoteJid).text(`❌ *Catatan tidak ditemukan!*\n\n📝 Nama: ${noteName}\n⚠️ Catatan tidak ada di database`);
                 return;
             }
 
@@ -30,24 +26,18 @@ class DelNoteFeature extends BaseFeature {
             // Delete note
             const success = await KeynoteSystem.deleteKeynote(noteName);
             if (!success) {
-                await sock.sendMessage(m.key.remoteJid, { 
-                    text: `❌ Gagal menghapus keynote "${noteName}"!` 
-                });
+                await client.send(ctx.remoteJid).text(`❌ Gagal menghapus keynote "${noteName}"!`);
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: `🗑️ *Catatan Berhasil Dihapus!*\n\n` +
+            await client.send(ctx.remoteJid).text(`🗑️ *Catatan Berhasil Dihapus!*\n\n` +
                       `📝 Nama: ${noteName}\n` +
                       `📄 Content: ${noteContent}\n\n` +
-                      `✅ Catatan telah dihapus dari database`
-            });
+                      `✅ Catatan telah dihapus dari database`);
 
         } catch (error) {
             console.error('DelNote error:', error);
-            await sock.sendMessage(m.key.remoteJid, { 
-                text: '❌ Terjadi kesalahan saat menghapus catatan!'
-            });
+            await client.send(ctx.remoteJid).text('❌ Terjadi kesalahan saat menghapus catatan!');
         }
     }
 }

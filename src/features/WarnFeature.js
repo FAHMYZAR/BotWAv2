@@ -7,47 +7,45 @@ class WarnFeature extends BaseFeature {
         super('warn', 'Beri warning ke member (3x = kick)', false, 'admin');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const groupId = m.key.remoteJid;
+            const groupId = ctx.remoteJid;
             
             if (!groupId.endsWith('@g.us')) {
-                await sock.sendMessage(groupId, { text: '❌ Perintah ini hanya untuk grup!' });
+                await client.send(groupId).text('❌ Perintah ini hanya untuk grup!');
                 return;
             }
 
-            const senderId = m.key.participant || m.key.remoteJid;
+            const senderId = ctx.senderJid || ctx.remoteJid;
             
-            if (!await AdminHelper.canExecuteAdminCommand(sock, groupId, senderId)) {
-                await sock.sendMessage(groupId, { text: '❌ Hanya admin yang bisa warn member!' });
+            if (!await AdminHelper.canExecuteAdminCommand(client, groupId, senderId)) {
+                await client.send(groupId).text('❌ Hanya admin yang bisa warn member!');
                 return;
             }
 
-            const targetJid = AdminHelper.extractJid(m);
+            const targetJid = await AdminHelper.extractJidFromCtx(ctx);
             
             if (!targetJid) {
-                await sock.sendMessage(groupId, { 
-                    text: '❌ Tag atau reply pesan member yang ingin di-warn!\n\nContoh:\n> `/warn @user spam`\n> Reply pesan + `/warn alasan`' 
-                });
+                await client.send(groupId).text('❌ Tag atau reply pesan member yang ingin di-warn!\n\nContoh:\n> `/warn @user spam`\n> Reply pesan + `/warn alasan`');
                 return;
             }
 
             // Check if target is bot
-            if (await AdminHelper.isBotJid(sock, targetJid, groupId)) {
+            if (await AdminHelper.isBotJid(client, targetJid, groupId)) {
                 console.log('[WARN] 🚫 BLOCKED - Target is bot!');
-                await sock.sendMessage(groupId, { text: '🛡️' });
+                await client.send(groupId).text('🛡️');
                 return;
             }
 
             // Check if target is protected
             if (AdminHelper.isProtected(targetJid)) {
                 console.log('[WARN] 🚫 BLOCKED - Target is protected!');
-                await sock.sendMessage(groupId, { text: '🛡️' });
+                await client.send(groupId).text('🛡️');
                 return;
             }
 
-            if (await AdminHelper.isGroupAdmin(sock, groupId, targetJid)) {
-                await sock.sendMessage(groupId, { text: '❌ Tidak bisa warn admin!' });
+            if (await AdminHelper.isGroupAdmin(client, groupId, targetJid)) {
+                await client.send(groupId).text('❌ Tidak bisa warn admin!');
                 return;
             }
 
@@ -60,8 +58,8 @@ class WarnFeature extends BaseFeature {
             message += `Total Warn: ${totalWarns}/${WarnSystem.maxWarns}\n\n`;
 
             if (await WarnSystem.shouldKick(groupId, targetJid)) {
-                if (await AdminHelper.isBotAdmin(sock, groupId)) {
-                    await sock.groupParticipantsUpdate(groupId, [targetJid], 'remove');
+                if (await AdminHelper.isBotAdmin(client, groupId)) {
+                    await client.group.removeMember(groupId, [targetJid]);
                     message += `❌ Member telah di-kick karena mencapai ${WarnSystem.maxWarns} warning!`;
                     await WarnSystem.resetWarns(groupId, targetJid);
                 } else {
@@ -71,14 +69,12 @@ class WarnFeature extends BaseFeature {
                 message += `⚠️ ${WarnSystem.maxWarns - totalWarns} warning lagi akan di-kick!`;
             }
 
-            await sock.sendMessage(groupId, { 
-                text: message,
-                mentions: [targetJid]
-            });
+            await client.send(groupId).text(message).mentions([targetJid]
+            );
 
         } catch (error) {
             console.error('Warn error:', error);
-            await sock.sendMessage(m.key.remoteJid, { text: '❌ Gagal memberi warning!' });
+            await client.send(ctx.remoteJid).text('❌ Gagal memberi warning!');
         }
     }
 }

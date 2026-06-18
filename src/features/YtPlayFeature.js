@@ -10,18 +10,18 @@ class YtPlayFeature extends BaseFeature {
         this.messageCache = new Map();
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
             const query = args.join(' ');
 
             if (!query) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Masukkan kata kunci pencarian!\n\nContoh: .ytplay alan walker faded' 
                 });
                 return;
             }
 
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '🔍', key: m.key } });
+            await ctx.react('🔍');
 
             const searchResponse = await axios.get(`${config.apis.youtube}/search`, {
                 params: { 
@@ -34,17 +34,15 @@ class YtPlayFeature extends BaseFeature {
             const results = searchResponse.data.results;
 
             if (!results || results.length === 0) {
-                await sock.sendMessage(m.key.remoteJid, {
-                    react: { text: '', key: m.key }
-                });
-                await sock.sendMessage(m.key.remoteJid, { 
+                await ctx.react('');
+                await client.sendMessage(ctx.remoteJid, { 
                     text: `❌ Tidak ditemukan hasil untuk: *${query}*` 
                 });
                 return;
             }
 
             // Save search results to cache
-            const userId = m.key.participant || m.key.remoteJid;
+            const userId = ctx.senderJid || ctx.remoteJid;
             this.searchCache.set(userId, results);
             this.pageCache.set(userId, 0); // Start from page 0
 
@@ -55,10 +53,8 @@ class YtPlayFeature extends BaseFeature {
 
         } catch (error) {
             console.error('YtPlay search error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
+            await ctx.react('');
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Terjadi kesalahan saat mencari!' 
             });
         }
@@ -74,9 +70,7 @@ class YtPlayFeature extends BaseFeature {
         const end = start + itemsPerPage;
         const pageResults = results.slice(start, end);
 
-        await sock.sendMessage(m.key.remoteJid, {
-            react: { text: '', key: m.key }
-        });
+        await ctx.react('');
 
         let message = `🎵 *YOUTUBE MUSIC SEARCH*\n\n`;
         message += `📊 *RESULTS*\n`;
@@ -99,14 +93,14 @@ class YtPlayFeature extends BaseFeature {
         }
 
         if (isNew) {
-            const sent = await sock.sendMessage(m.key.remoteJid, {
+            const sent = await client.sendMessage(ctx.remoteJid, {
                 text: message
             });
             this.messageCache.set(userId, sent.key);
         } else {
             const messageKey = this.messageCache.get(userId);
             if (messageKey) {
-                await sock.sendMessage(m.key.remoteJid, {
+                await client.sendMessage(ctx.remoteJid, {
                     edit: messageKey,
                     text: message
                 });
@@ -117,12 +111,12 @@ class YtPlayFeature extends BaseFeature {
     }
 
     async handleNext(m, sock) {
-        const userId = m.key.participant || m.key.remoteJid;
+        const userId = ctx.senderJid || ctx.remoteJid;
         const currentPage = this.pageCache.get(userId) || 0;
         const results = this.searchCache.get(userId);
 
         if (!results) {
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Hasil pencarian sudah expired. Silakan search ulang dengan .ytplay' 
             });
             return;
@@ -130,7 +124,7 @@ class YtPlayFeature extends BaseFeature {
 
         const totalPages = Math.ceil(results.length / 5);
         if (currentPage >= totalPages - 1) {
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Sudah di halaman terakhir!' 
             });
             return;
@@ -140,19 +134,19 @@ class YtPlayFeature extends BaseFeature {
     }
 
     async handlePrev(m, sock) {
-        const userId = m.key.participant || m.key.remoteJid;
+        const userId = ctx.senderJid || ctx.remoteJid;
         const currentPage = this.pageCache.get(userId) || 0;
         const results = this.searchCache.get(userId);
 
         if (!results) {
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Hasil pencarian sudah expired. Silakan search ulang dengan .ytplay' 
             });
             return;
         }
 
         if (currentPage <= 0) {
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Sudah di halaman pertama!' 
             });
             return;
@@ -163,11 +157,11 @@ class YtPlayFeature extends BaseFeature {
 
     async handleSelection(m, sock, selection) {
         try {
-            const userId = m.key.participant || m.key.remoteJid;
+            const userId = ctx.senderJid || ctx.remoteJid;
             const results = this.searchCache.get(userId);
 
             if (!results) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Hasil pencarian sudah expired. Silakan search ulang dengan .ytplay' 
                 });
                 return;
@@ -175,14 +169,14 @@ class YtPlayFeature extends BaseFeature {
 
             const index = parseInt(selection) - 1;
             if (index < 0 || index >= results.length) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: `❌ Nomor tidak valid! Pilih 1-${results.length}` 
                 });
                 return;
             }
 
             const selectedVideo = results[index];
-            await sock.sendMessage(m.key.remoteJid, { react: { text: '⏳', key: m.key } });
+            await ctx.react('⏳');
 
             const videoUrl = `https://www.youtube.com/watch?v=${selectedVideo.id}`;
 
@@ -211,24 +205,17 @@ class YtPlayFeature extends BaseFeature {
             const audioBuffer = Buffer.from(audioResponse.data);
             const sizeInMB = (audioBuffer.length / (1024 * 1024)).toFixed(2);
 
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
+            await ctx.react('');
 
             // Send as audio with metadata
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 audio: audioBuffer,
                 mimetype: 'audio/mpeg',
-                ptt: false,
-                contextInfo: {
-                    externalAdReply: {
-                        title: selectedVideo.title,
-                        body: `Duration: ${selectedVideo.duration} | Size: ${sizeInMB} MB`,
-                        mediaType: 2,
-                        thumbnail: null,
-                        sourceUrl: videoUrl
-                    }
-                }
+                ptt: false
+            });
+
+            await client.sendMessage(ctx.remoteJid, {
+                text: `🎵 *${selectedVideo.title}*\nDuration: ${selectedVideo.duration} | Size: ${sizeInMB} MB\n${videoUrl}`
             });
 
             // Clear cache after successful download
@@ -237,10 +224,8 @@ class YtPlayFeature extends BaseFeature {
 
         } catch (error) {
             console.error('YtPlay download error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, {
-                react: { text: '', key: m.key }
-            });
-            await sock.sendMessage(m.key.remoteJid, { 
+            await ctx.react('');
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Terjadi kesalahan saat memutar audio!' 
             });
         }
@@ -248,3 +233,4 @@ class YtPlayFeature extends BaseFeature {
 }
 
 module.exports = YtPlayFeature;
+

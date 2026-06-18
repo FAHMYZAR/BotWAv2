@@ -5,12 +5,12 @@ class CekJoniFeature extends BaseFeature {
         super('cekjoni', 'Fitur lucu cek ukuran joni', false, 'fun');
     }
 
-    async execute(m, sock, args) {
+    async execute(ctx, client, args) {
         try {
-            const quoted = m.message?.extendedTextMessage?.contextInfo;
+            const quoted = (await ctx.replied().catch(()=>null));
             
             if (!quoted || !quoted.participant) {
-                await sock.sendMessage(m.key.remoteJid, { 
+                await client.sendMessage(ctx.remoteJid, { 
                     text: '❌ Reply pesan seseorang untuk mengukur!' 
                 });
                 return;
@@ -26,20 +26,20 @@ class CekJoniFeature extends BaseFeature {
             } catch {}
 
             // Progress animation (editable)
-            const progressMsg = await sock.sendMessage(m.key.remoteJid, { 
+            const progressMsg = await client.sendMessage(ctx.remoteJid, { 
                 text: '🔄 *Calculating size...*\n```[▒▒▒▒▒▒▒▒▒▒] 0%```' 
             });
             
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '🔄 *Analyzing data...*\n```[██████▒▒▒▒] 60%```',
                 edit: progressMsg.key
             });
             
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '🔄 *Final calculation...*\n```[██████████] 100%```',
                 edit: progressMsg.key
             });
@@ -55,7 +55,7 @@ class CekJoniFeature extends BaseFeature {
             else if (size < 40) sizeEmoji = '😏🍆';
             else sizeEmoji = '🍆🍆';
 
-            await sock.sendMessage(m.key.remoteJid, {
+            await client.sendMessage(ctx.remoteJid, {
                 text: `*Hasil perhitungan ukuran joni* ${sizeEmoji}\n\n` +
                       `*Nama:* ${name}\n` +
                       `*Ukuran Joni:* ${size}cm\n\n` +
@@ -65,7 +65,7 @@ class CekJoniFeature extends BaseFeature {
 
         } catch (error) {
             console.error('CekJoni error:', error.message);
-            await sock.sendMessage(m.key.remoteJid, { 
+            await client.sendMessage(ctx.remoteJid, { 
                 text: '❌ Terjadi kesalahan!' 
             });
         }
@@ -73,3 +73,4 @@ class CekJoniFeature extends BaseFeature {
 }
 
 module.exports = CekJoniFeature;
+
